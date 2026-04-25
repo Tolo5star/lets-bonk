@@ -1,7 +1,15 @@
+import { createServer } from "http";
 import { WebSocketServer } from "ws";
 
 const PORT = process.env.PORT || 8080;
-const wss = new WebSocketServer({ port: PORT });
+
+// HTTP server — needed for Railway/Render health checks + WS upgrade
+const server = createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("lets-bonk relay ok");
+});
+
+const wss = new WebSocketServer({ server });
 const rooms = new Map(); // code -> { host, guest }
 const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -19,7 +27,7 @@ function send(ws, msg) {
 
 wss.on("connection", (ws) => {
   let myRoom = null;
-  let myRole = null; // "host" or "guest"
+  let myRole = null;
 
   ws.on("message", (raw) => {
     let msg;
@@ -66,4 +74,6 @@ wss.on("connection", (ws) => {
   });
 });
 
-console.log(`Relay server listening on port ${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Relay server listening on port ${PORT}`);
+});
