@@ -173,7 +173,7 @@ export class GameLoop {
         if (dist < result.attack.knockback * 5 + PLAYER_RADIUS + enemy.radius) {
           const actualDamage = this.player.takeDamage(result.attack.damage);
           this.player.applyKnockback(
-            result.attack.knockback,
+            result.attack.knockback * this.modConfig.playerKnockbackMult,
             result.attack.fromX,
             result.attack.fromY
           );
@@ -209,6 +209,12 @@ export class GameLoop {
     // 7. Wave management
     const aliveEnemies = this.enemies.filter((e) => !e.dead).length;
     const newEnemies = this.spawner.tick(aliveEnemies);
+    // Apply enemy speed modifier to newly spawned enemies
+    if (this.modConfig.enemySpeedMult !== 1) {
+      for (const enemy of newEnemies) {
+        enemy.applySpeedMult(this.modConfig.enemySpeedMult);
+      }
+    }
     this.enemies.push(...newEnemies);
 
     // Wave cooldown between waves (micro-pause)

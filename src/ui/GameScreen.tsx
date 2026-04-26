@@ -80,9 +80,14 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
     [tryMountTouch]
   );
 
-  // Game lifecycle — only starts after modifier selection
+  const gameInitedRef = useRef(false);
+
+  // Game lifecycle — only starts ONCE after modifier selection
   useEffect(() => {
-    if (phase === "modifier_select") return;
+    if (phase !== "playing") return;
+    if (gameInitedRef.current) return; // already running, don't recreate
+    gameInitedRef.current = true;
+
     const canvas = canvasRef.current;
     const input = inputRef.current;
     if (!canvas || !input) return;

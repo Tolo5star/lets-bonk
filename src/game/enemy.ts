@@ -137,6 +137,11 @@ export class Enemy {
     this.baseDamage = this.damage;
   }
 
+  applySpeedMult(mult: number) {
+    this.speed *= mult;
+    this.baseSpeed *= mult;
+  }
+
   private distTo(px: number, py: number): number {
     const dx = px - this.x;
     const dy = py - this.y;
