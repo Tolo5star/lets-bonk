@@ -1,5 +1,6 @@
 import { PlayerState, type MoverInput, type FighterInput, type GameSnapshot, type ScoreData } from "./types";
-import { TICK_MS, PLAYER_RADIUS } from "./constants";
+import { TICK_MS, PLAYER_RADIUS, HEAL_AMOUNT } from "./constants";
+import { type ModifierConfig, defaultConfig } from "./modifiers";
 import { Player } from "./player";
 import { Enemy, Projectile } from "./enemy";
 import { EnemySpawner } from "./enemy-spawner";
@@ -24,13 +25,17 @@ export type GameEventType =
   | "enemy_killed"
   | "boss_enraged"
   | "heal_success"
+  | "heal_interrupted"
   | "block_activated"
-  | "attack_triggered";
+  | "attack_triggered"
+  | "powerup_available";
 
 export interface GameEvent {
   type: GameEventType;
   data?: unknown;
 }
+
+export type BossVariant = "brute" | "frenzy" | "summoner";
 
 export class GameLoop {
   player = new Player();
@@ -42,6 +47,10 @@ export class GameLoop {
   running = false;
   gameOver = false;
   gameWon = false;
+  modConfig: ModifierConfig = defaultConfig();
+  bossVariant: BossVariant = "brute";
+  powerUpWave = 2; // offer power-up after this wave
+  powerUpPending = false;
 
   private moverInput: MoverInput = { moveX: 0, moveY: 0, dash: false };
   private fighterInput: FighterInput = {
@@ -82,12 +91,29 @@ export class GameLoop {
     this.fighterInput = input;
   }
 
+  setModConfig(config: ModifierConfig) {
+    this.modConfig = config;
+  }
+
+  applyPowerUp(apply: (config: ModifierConfig) => void) {
+    apply(this.modConfig);
+    this.powerUpPending = false;
+  }
+
   start() {
     this.reset();
     this.running = true;
     this.score.start();
+
+    // Randomize boss variant
+    const variants: BossVariant[] = ["brute", "frenzy", "summoner"];
+    this.bossVariant = variants[Math.floor(Math.random() * variants.length)];
+
     this.spawner.startWave();
-    this.emit("wave_start", { wave: this.spawner.currentWave });
+    this.emit("wave_start", {
+      wave: this.spawner.currentWave,
+      intro: this.spawner.waveIntro,
+    });
 
     this.intervalId = window.setInterval(() => this.update(), TICK_MS);
   }
@@ -195,7 +221,15 @@ export class GameLoop {
           nextWave: this.spawner.currentWave,
           taunt: this.spawner.waveTaunt,
         });
+
+        // Offer power-up after wave 2
+        if (this.score.wavesCompleted === this.powerUpWave) {
+          this.powerUpPending = true;
+          this.emit("powerup_available");
+        }
       }
+      // Don't advance to next wave while power-up selection is pending
+      if (this.powerUpPending) return;
       if (this.waveCooldownTicks >= this.WAVE_COOLDOWN) {
         this.waveCooldownTicks = 0;
         this.spawner.startWave();
@@ -279,7 +313,7 @@ export class GameLoop {
     }
 
     if (result.healTriggered) {
-      this.player.heal();
+      this.player.healAmount(Math.round(HEAL_AMOUNT * this.modConfig.healAmountMult));
       this.score.healSuccesses++;
       this.emit("heal_success");
     }
@@ -290,6 +324,15 @@ export class GameLoop {
       ctx.state !== PlayerState.HealingCharge
     ) {
       this.score.healAttempts++;
+    }
+
+    // Heal interrupted — was charging but now isn't
+    if (
+      ctx.state === PlayerState.HealingCharge &&
+      result.newState !== PlayerState.HealingCharge &&
+      result.newState !== PlayerState.HealingActive
+    ) {
+      this.emit("heal_interrupted");
     }
 
     if (result.attackTriggered) {
@@ -307,8 +350,9 @@ export class GameLoop {
             enemy.y - this.player.y,
             enemy.x - this.player.x
           );
-          enemy.takeDamage(hitbox.damage, hitbox.knockback, angleToEnemy);
-          this.score.damageDealt += hitbox.damage;
+          const modDamage = hitbox.damage * this.modConfig.attackDamageMult;
+          enemy.takeDamage(modDamage, hitbox.knockback, angleToEnemy);
+          this.score.damageDealt += modDamage;
           this.emit("enemy_hit");
 
           if (enemy.dead) {

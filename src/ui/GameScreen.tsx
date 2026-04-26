@@ -8,11 +8,17 @@ import { MoverControls } from "./MoverControls";
 import { FighterControls } from "./FighterControls";
 import { FeedbackToasts, useFeedbackToasts } from "./FeedbackToast";
 import { spawnAttackText, spawnDamageText, spawnHealText } from "../render/draw-effects";
+import { getCommentary, trackKill } from "../game/commentary";
+import { pickModifierChoices, defaultConfig, type ModifierConfig } from "../game/modifiers";
+import { pickPowerUpChoices, type PowerUp } from "../game/powerups";
+import { fonts, shadows } from "./theme";
 import type { ScoreData, PlayerSnapshot } from "../game/types";
 
 interface GameScreenProps {
   onGameOver: (scores: ScoreData, won: boolean) => void;
 }
+
+type GamePhase = "modifier_select" | "playing" | "powerup_select";
 
 export function GameScreen({ onGameOver }: GameScreenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -23,6 +29,12 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
   showToastRef.current = showToast;
   const onGameOverRef = useRef(onGameOver);
   onGameOverRef.current = onGameOver;
+
+  const [phase, setPhase] = useState<GamePhase>("modifier_select");
+  const [modChoices] = useState(() => pickModifierChoices(3));
+  const [selectedMod, setSelectedMod] = useState<ModifierConfig>(defaultConfig());
+  const [powerUpChoices, setPowerUpChoices] = useState<PowerUp[]>([]);
+  const gameRef = useRef<GameLoop | null>(null);
 
   // Create InputManager ONCE eagerly — it must exist before children mount
   const inputRef = useRef<InputManager | null>(null);
@@ -68,8 +80,9 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
     [tryMountTouch]
   );
 
-  // Game lifecycle
+  // Game lifecycle — only starts after modifier selection
   useEffect(() => {
+    if (phase === "modifier_select") return;
     const canvas = canvasRef.current;
     const input = inputRef.current;
     if (!canvas || !input) return;
@@ -80,13 +93,15 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
     // Try mounting touch now (children may have already mounted)
     tryMountTouch();
 
-    // Goofy feedback events
+    // Dynamic commentary — uses cooldown-based line pools
     game.onEvent((event) => {
       const toast = showToastRef.current;
+      const line = getCommentary(event.type);
+
       switch (event.type) {
         case "player_hit": {
           renderer.triggerScreenShake(8);
-          toast(randomFrom(["OOF", "BONK!", "OUCH", "YIKES"]), "#ff6b6b");
+          if (line) toast(line.text, line.color);
           const snap = game.snapshot();
           spawnDamageText(snap.player.x, snap.player.y, 8);
           break;
@@ -94,10 +109,17 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
         case "enemy_hit":
           renderer.triggerScreenShake(3);
           break;
-        case "enemy_killed":
+        case "enemy_killed": {
           renderer.triggerScreenShake(5);
-          toast(randomFrom(["SPLAT!", "BONKED!", "BYE BYE", "REKT"]), "#ffeaa7");
+          // Check for multi-kill combo
+          const multiLine = trackKill();
+          if (multiLine) {
+            toast(multiLine, "#ff6b9d");
+          } else if (line) {
+            toast(line.text, line.color);
+          }
           break;
+        }
         case "attack_triggered": {
           const d = event.data as { type: string; hitbox: { x: number; y: number; range: number; angle: number } };
           spawnAttackText(
@@ -108,13 +130,16 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
           break;
         }
         case "heal_success": {
-          toast("HEALED! +30", "#55efc4");
+          if (line) toast(line.text, line.color);
           const s = game.snapshot();
           spawnHealText(s.player.x, s.player.y);
           break;
         }
+        case "heal_interrupted":
+          if (line) toast(line.text, line.color);
+          break;
         case "block_activated":
-          toast("SHIELD UP!", "#74b9ff");
+          if (line) toast(line.text, line.color);
           break;
         case "game_over": {
           const d = event.data as { scores: ScoreData };
@@ -135,16 +160,21 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
           break;
         }
         case "wave_pause": {
-          const d = event.data as { taunt: string };
-          toast(d.taunt, "rgba(255,255,255,0.8)");
+          const wLine = getCommentary("wave_complete");
+          if (wLine) toast(wLine.text, wLine.color);
           break;
         }
         case "boss_enraged":
+          if (line) toast(line.text, line.color);
+          else toast("IT GOT ANGRY!!", "#ff4757");
           renderer.triggerScreenShake(12);
-          toast("IT GOT ANGRY!! 😡", "#ff4757");
           break;
         case "player_low_hp":
-          // Pulse is handled by renderer vignette
+          if (line) toast(line.text, line.color);
+          break;
+        case "powerup_available":
+          setPowerUpChoices(pickPowerUpChoices(3));
+          setPhase("powerup_select");
           break;
       }
     });
@@ -161,11 +191,15 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
       renderer.updateSnapshot(game.snapshot());
     }, 16);
 
-    // Update React state for control feedback at lower rate (reduces re-renders)
+    // Update React state for control feedback at lower rate
     const uiInterval = window.setInterval(() => {
       if (!game.running && !game.gameOver) return;
       setPlayerState(game.snapshot().player);
-    }, 100); // 10fps for UI — controls only need cooldown info
+    }, 100);
+
+    // Apply selected modifier
+    game.setModConfig(selectedMod);
+    gameRef.current = game;
 
     game.start();
     renderer.start();
@@ -176,7 +210,7 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
       game.stop();
       renderer.destroy();
     };
-  }, [tryMountTouch]);
+  }, [tryMountTouch, phase, selectedMod]);
 
   // Cleanup input on unmount
   useEffect(() => {
@@ -185,22 +219,79 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
     };
   }, []);
 
-  // Mobile layout: fullscreen canvas + overlaid controls
+  // --- Modifier selection (pre-game) ---
+  if (phase === "modifier_select") {
+    return (
+      <div style={ms.container}>
+        <h2 style={ms.title}>Pick Your Chaos</h2>
+        <p style={ms.subtitle}>Choose a modifier for this run</p>
+        <div style={ms.choices}>
+          {modChoices.map((mod) => (
+            <button
+              key={mod.id}
+              style={ms.modCard}
+              onClick={() => {
+                const config = defaultConfig();
+                mod.apply(config);
+                setSelectedMod(config);
+                setPhase("playing");
+              }}
+            >
+              <span style={ms.modIcon}>{mod.icon}</span>
+              <span style={ms.modName}>{mod.name}</span>
+              <span style={ms.modDesc}>{mod.description}</span>
+            </button>
+          ))}
+        </div>
+        <button
+          style={ms.skipBtn}
+          onClick={() => setPhase("playing")}
+        >
+          No modifier (classic)
+        </button>
+      </div>
+    );
+  }
+
+  // --- Power-up selection (mid-game overlay) ---
+  const powerUpOverlay = phase === "powerup_select" && (
+    <div style={ms.powerUpOverlay}>
+      <h2 style={ms.title}>Power Up!</h2>
+      <p style={ms.subtitle}>Choose a boost for the next waves</p>
+      <div style={ms.choices}>
+        {powerUpChoices.map((pu) => (
+          <button
+            key={pu.id}
+            style={ms.modCard}
+            onClick={() => {
+              if (gameRef.current) {
+                gameRef.current.applyPowerUp(pu.apply);
+              }
+              setPhase("playing");
+            }}
+          >
+            <span style={ms.modIcon}>{pu.icon}</span>
+            <span style={ms.modName}>{pu.name}</span>
+            <span style={ms.modDesc}>{pu.description}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Mobile layout
   if (isTouch) {
     return (
       <div style={styles.fullscreen}>
         <canvas ref={canvasRef} style={styles.canvasFull} />
         <FeedbackToasts toasts={toasts} />
-
-        {/* LEFT: Mover controls */}
         <div style={styles.moverOverlay}>
           <MoverControls onMount={onMoverMount} player={playerState} />
         </div>
-
-        {/* RIGHT: Fighter controls */}
         <div style={styles.fighterOverlay}>
           <FighterControls onMount={onFighterMount} player={playerState} />
         </div>
+        {powerUpOverlay}
       </div>
     );
   }
@@ -210,13 +301,102 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
     <div style={styles.fullscreen}>
       <canvas ref={canvasRef} style={styles.canvasFull} />
       <FeedbackToasts toasts={toasts} />
+      {powerUpOverlay}
     </div>
   );
 }
 
-function randomFrom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+// Modifier/power-up selection styles
+const ms: Record<string, React.CSSProperties> = {
+  container: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
+    background: `radial-gradient(ellipse at 50% 40%, #2a2a4a 0%, #1a1a2e 70%)`,
+    padding: "1.5rem",
+    gap: "12px",
+  },
+  title: {
+    fontFamily: fonts.display,
+    fontSize: "clamp(1.5rem, 5vw, 2.5rem)",
+    color: "#ffeaa7",
+    textShadow: shadows.text,
+  },
+  subtitle: {
+    fontFamily: fonts.body,
+    fontWeight: 700,
+    fontSize: "0.9rem",
+    color: "rgba(255,255,255,0.5)",
+    marginBottom: "8px",
+  },
+  choices: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  modCard: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "6px",
+    padding: "14px 18px",
+    borderRadius: "14px",
+    border: "2px solid rgba(255,255,255,0.15)",
+    background: "rgba(255,255,255,0.05)",
+    cursor: "pointer",
+    minWidth: "120px",
+    maxWidth: "160px",
+    fontFamily: fonts.body,
+    color: "#f0e6d3",
+    transition: "all 0.15s",
+  },
+  modIcon: {
+    fontSize: "1.8rem",
+  },
+  modName: {
+    fontFamily: fonts.display,
+    fontSize: "0.95rem",
+    color: "#ffeaa7",
+  },
+  modDesc: {
+    fontSize: "0.7rem",
+    fontWeight: 600,
+    color: "rgba(255,255,255,0.5)",
+    textAlign: "center",
+  },
+  skipBtn: {
+    marginTop: "8px",
+    padding: "8px 20px",
+    fontFamily: fonts.body,
+    fontWeight: 700,
+    fontSize: "0.8rem",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: "8px",
+    background: "transparent",
+    color: "rgba(255,255,255,0.4)",
+    cursor: "pointer",
+  },
+  powerUpOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(10, 10, 30, 0.85)",
+    backdropFilter: "blur(6px)",
+    zIndex: 20,
+    gap: "10px",
+    padding: "1rem",
+  },
+};
+
 
 const styles: Record<string, React.CSSProperties> = {
   fullscreen: {

@@ -94,6 +94,10 @@ export class Player {
     this.hp = Math.min(PLAYER_MAX_HP, this.hp + HEAL_AMOUNT);
   }
 
+  healAmount(amount: number) {
+    this.hp = Math.min(PLAYER_MAX_HP, this.hp + amount);
+  }
+
   setBlockCooldown() {
     this.blockCooldown = BLOCK_COOLDOWN_TICKS;
   }
