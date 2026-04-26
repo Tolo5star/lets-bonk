@@ -7,6 +7,7 @@ import { isTouchDevice } from "../input/detect-device";
 import { MoverControls } from "./MoverControls";
 import { FighterControls } from "./FighterControls";
 import { FeedbackToasts, useFeedbackToasts } from "./FeedbackToast";
+import { SnapshotInterpolator } from "../render/interpolation";
 import type { WsTransport } from "../network/ws-transport";
 import type { NetMessage } from "../network/types";
 import type {
@@ -105,6 +106,7 @@ export function MultiplayerGameScreen({
 
     const renderer = new Renderer(canvas);
     const toast = showToastRef.current;
+    const interpolator = isHost ? null : new SnapshotInterpolator();
 
     // Remote input buffer with sticky one-shot flags
     const remoteInput: { mover: MoverInput; fighter: FighterInput } = {
@@ -152,9 +154,9 @@ export function MultiplayerGameScreen({
           break;
 
         case "snapshot":
-          // Guest: render the snapshot from host
-          if (!isHost) {
-            renderer.updateSnapshot(msg.data);
+          // Guest: feed to interpolator for smooth rendering
+          if (!isHost && interpolator) {
+            interpolator.push(msg.data);
             setPlayerState(msg.data.player);
           }
           break;
@@ -253,7 +255,7 @@ export function MultiplayerGameScreen({
 
       game.start();
     } else {
-      // === GUEST: send inputs only ===
+      // === GUEST: send inputs + interpolate snapshots ===
       inputInterval = window.setInterval(() => {
         if (role === "mover") {
           transport.send({ type: "input", mover: input.getMoverInput() });
@@ -262,7 +264,13 @@ export function MultiplayerGameScreen({
         }
       }, TICK_MS);
 
-      snapshotInterval = 0; // guest doesn't snapshot
+      // Feed interpolated snapshots to renderer at 60fps
+      snapshotInterval = window.setInterval(() => {
+        if (interpolator) {
+          const snap = interpolator.get();
+          if (snap) renderer.updateSnapshot(snap);
+        }
+      }, 16);
     }
 
     renderer.start();
