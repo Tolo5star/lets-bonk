@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { GameLoop } from "../game/game-loop";
 import { Renderer } from "../render/renderer";
 import { InputManager } from "../input/input-manager";
-import { TICK_MS } from "../game/constants";
+import { TICK_MS, HEAVY_ATTACK_CHARGE_TICKS } from "../game/constants";
+import { PlayerState } from "../game/types";
 import { isTouchDevice } from "../input/detect-device";
 import { MoverControls } from "./MoverControls";
 import { FighterControls } from "./FighterControls";
@@ -306,57 +307,87 @@ export function MultiplayerGameScreen({
 
       game.start();
     } else {
-      // === GUEST: send inputs + interpolate snapshots ===
+      // === GUEST: send inputs + predict visuals ===
 
-      // Track attack state for local prediction
-      let wasAttackHeld = false;
+      // Prediction state — tracks local input for instant visual feedback
+      let attackHoldStart = 0;
+      let attackReleaseTime = 0;
+      let wasHeavy = false;
+      let isHoldingAttack = false;
+      let blockHoldStart = 0;
+      let isHoldingBlock = false;
 
       inputInterval = window.setInterval(() => {
         if (role === "mover") {
           const moverIn = input.getMoverInput();
           transport.send({ type: "input", mover: moverIn });
-
-          // Predict dash visual: instant screen feedback
-          if (moverIn.dash) {
-            renderer.triggerScreenShake(2);
-          }
+          if (moverIn.dash) renderer.triggerScreenShake(2);
         } else {
           const fighterIn = input.getFighterInput();
           transport.send({ type: "input", fighter: fighterIn });
 
-          // LOCAL ATTACK PREDICTION — show visual instantly, don't wait for host
-          // Predict attack release (light or heavy attack fires)
-          if (fighterIn.attackRelease && wasAttackHeld) {
+          // Track attack hold for prediction
+          if (fighterIn.attackStart) {
+            attackHoldStart = performance.now();
+            isHoldingAttack = true;
+          }
+          if (fighterIn.attackRelease && isHoldingAttack) {
+            wasHeavy = (performance.now() - attackHoldStart) > 800;
+            attackReleaseTime = performance.now();
+            isHoldingAttack = false;
+
+            // Spawn sparks instantly (predicted)
             const snap = interpolator?.get();
             if (snap) {
-              const isHeavy = wasAttackHeld && (performance.now() - attackHoldStart) > 800;
-              const range = isHeavy ? 100 : 80;
-              // Spawn sparks at predicted hit location
+              const range = wasHeavy ? 100 : 80;
               spawnAttackText(
                 snap.player.x + Math.cos(snap.player.angle) * range * 0.5,
                 snap.player.y + Math.sin(snap.player.angle) * range * 0.5,
-                isHeavy
+                wasHeavy
               );
-              renderer.triggerScreenShake(isHeavy ? 4 : 2);
+              renderer.triggerScreenShake(wasHeavy ? 4 : 2);
             }
           }
-
-          // Track hold state for heavy detection
-          if (fighterIn.attackStart) {
-            attackHoldStart = performance.now();
+          if (!fighterIn.attackHold) {
+            isHoldingAttack = false;
           }
-          wasAttackHeld = fighterIn.attackHold;
+
+          // Track block hold
+          if (fighterIn.blockHold && !isHoldingBlock) {
+            blockHoldStart = performance.now();
+          }
+          isHoldingBlock = fighterIn.blockHold;
         }
       }, TICK_MS);
 
-      let attackHoldStart = 0;
-
-      // Feed interpolated snapshots to renderer at 60fps
+      // Feed interpolated snapshots to renderer at 60fps WITH state prediction overlay
       snapshotInterval = window.setInterval(() => {
-        if (interpolator) {
-          const snap = interpolator.get();
-          if (snap) renderer.updateSnapshot(snap);
+        if (!interpolator) return;
+        const snap = interpolator.get();
+        if (!snap) return;
+
+        // Apply fighter prediction: override player state for instant visual
+        if (role === "fighter") {
+          const now = performance.now();
+
+          if (isHoldingAttack) {
+            // Charging heavy attack — show charge ring instantly
+            snap.player.state = PlayerState.HeavyCharging;
+            snap.player.stateTimer = Math.floor((now - attackHoldStart) / TICK_MS);
+          } else if (now - attackReleaseTime < 400) {
+            // Just released attack — show attack arc instantly
+            snap.player.state = PlayerState.Attacking;
+            snap.player.stateTimer = Math.floor((now - attackReleaseTime) / TICK_MS);
+            snap.player.attackCharge = wasHeavy ? HEAVY_ATTACK_CHARGE_TICKS : 0;
+          }
+
+          if (isHoldingBlock && !isHoldingAttack) {
+            snap.player.state = PlayerState.Blocking;
+            snap.player.stateTimer = Math.floor((now - blockHoldStart) / TICK_MS);
+          }
         }
+
+        renderer.updateSnapshot(snap);
       }, 16);
     }
 
