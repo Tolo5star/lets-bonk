@@ -2,15 +2,15 @@ import { createServer } from "http";
 import { WebSocketServer } from "ws";
 
 const PORT = process.env.PORT || 8080;
+const PING_INTERVAL = 25_000; // 25s — keeps connection alive through proxies
 
-// HTTP server — needed for Railway/Render health checks + WS upgrade
 const server = createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
   res.end("lets-bonk relay ok");
 });
 
 const wss = new WebSocketServer({ server });
-const rooms = new Map(); // code -> { host, guest }
+const rooms = new Map();
 const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function makeCode() {
@@ -25,7 +25,24 @@ function send(ws, msg) {
   if (ws.readyState === 1) ws.send(JSON.stringify(msg));
 }
 
+// Ping all clients every 25s to prevent proxy timeout
+const interval = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) {
+      ws.terminate();
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, PING_INTERVAL);
+
+wss.on("close", () => clearInterval(interval));
+
 wss.on("connection", (ws) => {
+  ws.isAlive = true;
+  ws.on("pong", () => { ws.isAlive = true; });
+
   let myRoom = null;
   let myRole = null;
 
