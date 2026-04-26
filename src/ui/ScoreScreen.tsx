@@ -14,7 +14,7 @@ function getTeamTitle(scores: ScoreData, won: boolean): string {
   if (!won && scores.healSuccesses === 0) return "Healing? Never Heard Of It";
   if (!won) return "Certified Button Mashers";
   if (scores.damageTaken < 30) return "Untouchable Duo";
-  if (scores.healSuccesses >= 3) return "Trust-Based Relationship";
+  if (scores.healSuccesses >= 3) return "Teamwork Makes The Meme Work";
   if (scores.enemiesKilled > 20) return "Professional Bonkers";
   if (scores.damageTaken > 150) return "Barely Survived";
   return "Chaos Champions";
