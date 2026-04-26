@@ -19,16 +19,16 @@ export const DASH_COOLDOWN_TICKS = 40; // 2s
 // Light attack
 export const LIGHT_ATTACK_DAMAGE = 10;
 export const LIGHT_ATTACK_KNOCKBACK = 6;
-export const LIGHT_ATTACK_RANGE = 50;
-export const LIGHT_ATTACK_ARC = Math.PI / 2; // 90 degree arc
+export const LIGHT_ATTACK_RANGE = 65;
+export const LIGHT_ATTACK_ARC = Math.PI * 0.65; // wider arc
 export const LIGHT_ATTACK_RECOVERY_TICKS = 8; // 400ms
 
 // Heavy attack
 export const HEAVY_ATTACK_CHARGE_TICKS = 20; // 1s
 export const HEAVY_ATTACK_DAMAGE = 25;
 export const HEAVY_ATTACK_KNOCKBACK = 12;
-export const HEAVY_ATTACK_RANGE = 60;
-export const HEAVY_ATTACK_ARC = Math.PI * 0.75; // wider arc
+export const HEAVY_ATTACK_RANGE = 80;
+export const HEAVY_ATTACK_ARC = Math.PI * 0.9; // big wide arc
 export const HEAVY_ATTACK_RECOVERY_TICKS = 14; // 700ms
 export const HEAVY_ATTACK_SELF_RECOIL = 5;
 

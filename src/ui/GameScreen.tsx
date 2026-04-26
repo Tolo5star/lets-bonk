@@ -113,7 +113,6 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
           spawnHealText(s.player.x, s.player.y);
           break;
         }
-          break;
         case "block_activated":
           toast("SHIELD UP!", "#74b9ff");
           break;
@@ -142,20 +141,25 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
       game.setFighterInput(input.getFighterInput());
     }, TICK_MS);
 
-    // Snapshot feeding → renderer + React state for control feedback
-    const snapshotInterval = window.setInterval(() => {
+    // Feed snapshots to renderer every frame
+    const renderInterval = window.setInterval(() => {
       if (!game.running && !game.gameOver) return;
-      const snap = game.snapshot();
-      renderer.updateSnapshot(snap);
-      setPlayerState(snap.player);
+      renderer.updateSnapshot(game.snapshot());
     }, 16);
+
+    // Update React state for control feedback at lower rate (reduces re-renders)
+    const uiInterval = window.setInterval(() => {
+      if (!game.running && !game.gameOver) return;
+      setPlayerState(game.snapshot().player);
+    }, 100); // 10fps for UI — controls only need cooldown info
 
     game.start();
     renderer.start();
 
     return () => {
       clearInterval(inputInterval);
-      clearInterval(snapshotInterval);
+      clearInterval(renderInterval);
+      clearInterval(uiInterval);
       game.stop();
       renderer.destroy();
     };

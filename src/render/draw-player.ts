@@ -114,20 +114,70 @@ export function drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerSnapshot
     ctx.stroke();
   }
 
-  // Attack arc
+  // Attack arc — FLASHY
   if (player.state === PlayerState.Attacking) {
     const isHeavy = player.attackCharge >= HEAVY_ATTACK_CHARGE_TICKS;
     const range = isHeavy ? HEAVY_ATTACK_RANGE : LIGHT_ATTACK_RANGE;
     const arc = isHeavy ? HEAVY_ATTACK_ARC : LIGHT_ATTACK_ARC;
+    const attackAge = player.stateTimer;
+    const flash = Math.max(0, 1 - attackAge / 6); // bright flash that fades
 
+    // Outer glow
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, range + 10 * flash, player.angle - arc / 2 - 0.1, player.angle + arc / 2 + 0.1);
+    ctx.closePath();
+    ctx.fillStyle = isHeavy
+      ? `rgba(255, 80, 80, ${0.15 * flash})`
+      : `rgba(255, 180, 80, ${0.12 * flash})`;
+    ctx.fill();
+
+    // Main arc
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.arc(0, 0, range, player.angle - arc / 2, player.angle + arc / 2);
     ctx.closePath();
     ctx.fillStyle = isHeavy
-      ? "rgba(255, 107, 107, 0.25)"
-      : "rgba(255, 159, 67, 0.2)";
+      ? `rgba(255, 107, 107, ${0.2 + 0.35 * flash})`
+      : `rgba(255, 200, 100, ${0.15 + 0.3 * flash})`;
     ctx.fill();
+
+    // Bright edge line
+    ctx.beginPath();
+    ctx.arc(0, 0, range, player.angle - arc / 2, player.angle + arc / 2);
+    ctx.strokeStyle = isHeavy
+      ? `rgba(255, 150, 150, ${0.6 * flash})`
+      : `rgba(255, 220, 150, ${0.5 * flash})`;
+    ctx.lineWidth = 3 + 4 * flash;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.lineCap = "butt";
+
+    // Impact lines (radiating from center)
+    if (attackAge < 4) {
+      const lineCount = isHeavy ? 8 : 5;
+      for (let i = 0; i < lineCount; i++) {
+        const a = player.angle - arc / 2 + (arc / (lineCount - 1)) * i;
+        const innerR = range * 0.4;
+        const outerR = range * (0.7 + 0.4 * flash);
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * innerR, Math.sin(a) * innerR);
+        ctx.lineTo(Math.cos(a) * outerR, Math.sin(a) * outerR);
+        ctx.strokeStyle = isHeavy
+          ? `rgba(255, 200, 200, ${0.5 * flash})`
+          : `rgba(255, 230, 180, ${0.4 * flash})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    // Heavy attack: screen-flash circle
+    if (isHeavy && attackAge < 3) {
+      ctx.beginPath();
+      ctx.arc(0, 0, range * 1.3 * flash, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.08 * flash})`;
+      ctx.fill();
+    }
   }
 
   // --- BLOB BODY ---
