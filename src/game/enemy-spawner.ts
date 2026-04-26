@@ -19,7 +19,7 @@ const WAVES: WaveDefinition[] = [
       },
       {
         enemies: [{ type: EnemyType.Basic, count: 2 }],
-        delayTicks: 80,
+        delayTicks: 180,
       },
     ],
   },
@@ -37,7 +37,7 @@ const WAVES: WaveDefinition[] = [
         enemies: [
           { type: EnemyType.Charger, count: 2 },
         ],
-        delayTicks: 80,
+        delayTicks: 180,
       },
     ],
   },
@@ -56,14 +56,14 @@ const WAVES: WaveDefinition[] = [
           { type: EnemyType.Charger, count: 1 },
           { type: EnemyType.Ranged, count: 1 },
         ],
-        delayTicks: 60,
+        delayTicks: 90,
       },
       {
         enemies: [
           { type: EnemyType.Basic, count: 2 },
           { type: EnemyType.Ranged, count: 1 },
         ],
-        delayTicks: 120,
+        delayTicks: 180,
       },
     ],
   },
@@ -82,7 +82,7 @@ const WAVES: WaveDefinition[] = [
           { type: EnemyType.Ranged, count: 2 },
           { type: EnemyType.Basic, count: 2 },
         ],
-        delayTicks: 50,
+        delayTicks: 75,
       },
       {
         enemies: [
@@ -90,7 +90,7 @@ const WAVES: WaveDefinition[] = [
           { type: EnemyType.Ranged, count: 1 },
           { type: EnemyType.Basic, count: 1 },
         ],
-        delayTicks: 100,
+        delayTicks: 150,
       },
     ],
   },
@@ -104,7 +104,7 @@ const WAVES: WaveDefinition[] = [
       {
         // Phase 1 minions
         enemies: [{ type: EnemyType.Basic, count: 2 }],
-        delayTicks: 80,
+        delayTicks: 180,
       },
       {
         // Phase 2 pressure
@@ -112,7 +112,7 @@ const WAVES: WaveDefinition[] = [
           { type: EnemyType.Charger, count: 1 },
           { type: EnemyType.Ranged, count: 1 },
         ],
-        delayTicks: 160,
+        delayTicks: 360,
       },
       {
         // Final push
@@ -120,7 +120,7 @@ const WAVES: WaveDefinition[] = [
           { type: EnemyType.Basic, count: 2 },
           { type: EnemyType.Charger, count: 1 },
         ],
-        delayTicks: 240,
+        delayTicks: 360,
       },
     ],
   },

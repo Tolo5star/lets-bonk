@@ -55,7 +55,13 @@ export class GameLoop {
   private intervalId: number | null = null;
   private eventListeners: Array<(event: GameEvent) => void> = [];
   private waveCooldownTicks = 0;
-  private readonly WAVE_COOLDOWN = 60; // 3s between waves
+  private readonly WAVE_COOLDOWN = 90; // 3s between waves at 30Hz
+  private preTick: (() => void) | null = null;
+
+  /** Register a callback that runs right before each game tick — use for reading inputs */
+  onPreTick(cb: () => void) {
+    this.preTick = cb;
+  }
 
   onEvent(listener: (event: GameEvent) => void) {
     this.eventListeners.push(listener);
@@ -108,6 +114,10 @@ export class GameLoop {
 
   private update() {
     if (!this.running) return;
+
+    // 0. Read inputs right before processing (no drift from separate interval)
+    if (this.preTick) this.preTick();
+
     this.tick++;
 
     // 1. State machine resolution

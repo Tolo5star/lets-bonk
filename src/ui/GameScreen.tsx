@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { GameLoop } from "../game/game-loop";
 import { Renderer } from "../render/renderer";
 import { InputManager } from "../input/input-manager";
-import { TICK_MS } from "../game/constants";
+// TICK_MS no longer needed — input reads via onPreTick
 import { isTouchDevice } from "../input/detect-device";
 import { MoverControls } from "./MoverControls";
 import { FighterControls } from "./FighterControls";
@@ -149,12 +149,11 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
       }
     });
 
-    // Input polling — reads from InputManager every tick
-    const inputInterval = window.setInterval(() => {
-      if (!game.running) return;
+    // Read inputs synchronously before each game tick (no drift)
+    game.onPreTick(() => {
       game.setMoverInput(input.getMoverInput());
       game.setFighterInput(input.getFighterInput());
-    }, TICK_MS);
+    });
 
     // Feed snapshots to renderer every frame
     const renderInterval = window.setInterval(() => {
@@ -172,7 +171,6 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
     renderer.start();
 
     return () => {
-      clearInterval(inputInterval);
       clearInterval(renderInterval);
       clearInterval(uiInterval);
       game.stop();

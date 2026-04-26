@@ -8,6 +8,7 @@ import { MoverControls } from "./MoverControls";
 import { FighterControls } from "./FighterControls";
 import { FeedbackToasts, useFeedbackToasts } from "./FeedbackToast";
 import { SnapshotInterpolator } from "../render/interpolation";
+import { spawnAttackText, spawnDamageText, spawnHealText } from "../render/draw-effects";
 import type { WsTransport } from "../network/ws-transport";
 import type { NetMessage } from "../network/types";
 import type {
@@ -203,21 +204,44 @@ export function MultiplayerGameScreen({
         // Send events to guest
         transport.send({ type: "event", eventType: event.type, data: event.data });
 
-        // Local feedback
+        // Local feedback (host side)
         if (event.type === "player_hit") {
           renderer.triggerScreenShake(8);
           toast(randomFrom(["OOF", "BONK!", "OUCH"]), "#ff6b6b");
+          const snap = game!.snapshot();
+          spawnDamageText(snap.player.x, snap.player.y, 8);
         }
         if (event.type === "enemy_hit") renderer.triggerScreenShake(3);
         if (event.type === "enemy_killed") {
           renderer.triggerScreenShake(5);
           toast(randomFrom(["SPLAT!", "BONKED!"]), "#ffeaa7");
         }
-        if (event.type === "heal_success") toast("HEALED! +30", "#55efc4");
+        if (event.type === "attack_triggered") {
+          const d = event.data as { type: string; hitbox: { x: number; y: number; range: number; angle: number } };
+          spawnAttackText(
+            d.hitbox.x + Math.cos(d.hitbox.angle) * d.hitbox.range * 0.5,
+            d.hitbox.y + Math.sin(d.hitbox.angle) * d.hitbox.range * 0.5,
+            d.type === "heavy"
+          );
+        }
+        if (event.type === "heal_success") {
+          toast("HEALED! +30", "#55efc4");
+          const snap = game!.snapshot();
+          spawnHealText(snap.player.x, snap.player.y);
+        }
         if (event.type === "block_activated") toast("SHIELD UP!", "#74b9ff");
         if (event.type === "wave_start") {
-          const d = event.data as { wave: number };
+          const d = event.data as { wave: number; intro: string };
           toast(`WAVE ${d.wave}`, "#ffeaa7");
+          if (d.intro) setTimeout(() => toast(d.intro, "#fff"), 600);
+        }
+        if (event.type === "wave_pause") {
+          const d = event.data as { taunt: string };
+          toast(d.taunt, "rgba(255,255,255,0.8)");
+        }
+        if (event.type === "boss_enraged") {
+          renderer.triggerScreenShake(12);
+          toast("IT GOT ANGRY!! 😡", "#ff4757");
         }
         if (event.type === "game_over") {
           const d = event.data as { scores: ScoreData };
@@ -231,10 +255,8 @@ export function MultiplayerGameScreen({
         }
       });
 
-      // Input polling: local role + remote role
-      inputInterval = window.setInterval(() => {
-        if (!game!.running) return;
-
+      // Read inputs synchronously before each game tick
+      game.onPreTick(() => {
         if (role === "mover") {
           game!.setMoverInput(input.getMoverInput());
           game!.setFighterInput(consumeRemoteFighter());
@@ -242,7 +264,7 @@ export function MultiplayerGameScreen({
           game!.setFighterInput(input.getFighterInput());
           game!.setMoverInput(consumeRemoteMover());
         }
-      }, TICK_MS);
+      });
 
       // Snapshot broadcast
       snapshotInterval = window.setInterval(() => {
@@ -276,7 +298,7 @@ export function MultiplayerGameScreen({
     renderer.start();
 
     return () => {
-      clearInterval(inputInterval);
+      if (inputInterval) clearInterval(inputInterval);
       if (snapshotInterval) clearInterval(snapshotInterval);
       game?.stop();
       renderer.destroy();
