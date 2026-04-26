@@ -42,20 +42,22 @@ export function LobbyScreen({ initialRoomCode, onGameStart, onBack }: LobbyScree
     transportRef.current = transport;
     transport.onStateChange((s) => {
       if (s === "disconnected") {
-        setError("Connection lost");
+        setError("Connection lost. Try again.");
         setState("initial");
       }
+      // "reconnecting" state is silent — don't disrupt the UI
     });
     return transport;
   }, []);
 
   const waitForOpen = (transport: WsTransport): Promise<void> =>
     new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 5000);
+      const timeout = setTimeout(() => reject(new Error("Connection timeout")), 10000);
       if (transport.state === "connected") { clearTimeout(timeout); resolve(); return; }
       transport.onStateChange((s) => {
         if (s === "connected") { clearTimeout(timeout); resolve(); }
         if (s === "disconnected") { clearTimeout(timeout); reject(new Error("Failed to connect")); }
+        // "reconnecting" — keep waiting, don't reject yet
       });
     });
 

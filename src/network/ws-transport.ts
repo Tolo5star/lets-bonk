@@ -1,6 +1,6 @@
 import type { NetMessage } from "./types";
 
-export type ConnectionState = "connecting" | "connected" | "disconnected";
+export type ConnectionState = "connecting" | "connected" | "disconnected" | "reconnecting";
 
 export class WsTransport {
   private ws!: WebSocket;
@@ -9,16 +9,16 @@ export class WsTransport {
   private stateHandlers: Array<(state: ConnectionState) => void> = [];
   private intentionallyClosed = false;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 3;
+  private maxReconnectAttempts = 5;
   private reconnectTimeout: number | null = null;
   state: ConnectionState = "connecting";
 
   constructor(url: string) {
     this.url = url;
-    this.connect();
+    this.createSocket();
   }
 
-  private connect() {
+  private createSocket() {
     this.ws = new WebSocket(this.url);
 
     this.ws.onopen = () => {
@@ -34,12 +34,13 @@ export class WsTransport {
         return;
       }
 
-      // Try to reconnect
+      // Try to reconnect — DON'T notify "disconnected" until all retries exhausted
       if (this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectAttempts++;
+        this.state = "reconnecting";
+        for (const h of this.stateHandlers) h("reconnecting");
         const delay = Math.min(1000 * this.reconnectAttempts, 3000);
-        console.log(`WS reconnecting (attempt ${this.reconnectAttempts})...`);
-        this.reconnectTimeout = window.setTimeout(() => this.connect(), delay);
+        this.reconnectTimeout = window.setTimeout(() => this.createSocket(), delay);
       } else {
         this.state = "disconnected";
         for (const h of this.stateHandlers) h("disconnected");
@@ -55,7 +56,7 @@ export class WsTransport {
         const msg: NetMessage = JSON.parse(event.data);
         for (const h of this.handlers) h(msg);
       } catch {
-        // Ignore unparseable messages
+        // Ignore
       }
     };
   }
