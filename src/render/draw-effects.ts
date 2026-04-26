@@ -52,23 +52,23 @@ export function spawnAttackText(x: number, y: number, isHeavy: boolean) {
     rotation: (Math.random() - 0.5) * 0.4,
   });
 
-  // Spawn hit sparks!
-  const sparkCount = isHeavy ? 12 : 6;
+  // Spawn hit sparks! (sized for world-space, visible at mobile scale ~0.46)
+  const sparkCount = isHeavy ? 14 : 8;
   const sparkColors = isHeavy
     ? ["#ff6b6b", "#ff9f43", "#ffeaa7", "#fff"]
     : ["#ffeaa7", "#ff9f43", "#fff"];
   for (let i = 0; i < sparkCount; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 2 + Math.random() * (isHeavy ? 5 : 3);
+    const speed = 3 + Math.random() * (isHeavy ? 7 : 4);
     activeParticles.push({
       x,
       y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       color: sparkColors[Math.floor(Math.random() * sparkColors.length)],
-      radius: isHeavy ? 2 + Math.random() * 3 : 1.5 + Math.random() * 2,
+      radius: isHeavy ? 5 + Math.random() * 6 : 4 + Math.random() * 4,
       birth: Date.now(),
-      lifetime: 300 + Math.random() * 300,
+      lifetime: 350 + Math.random() * 350,
     });
   }
 }
@@ -88,17 +88,17 @@ export function spawnDamageText(x: number, y: number, damage: number) {
   });
 
   // Red damage sparks
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 6; i++) {
     const angle = Math.random() * Math.PI * 2;
     activeParticles.push({
-      x: x + (Math.random() - 0.5) * 10,
-      y: y + (Math.random() - 0.5) * 10,
-      vx: Math.cos(angle) * (1 + Math.random() * 2),
-      vy: Math.sin(angle) * (1 + Math.random() * 2),
+      x: x + (Math.random() - 0.5) * 15,
+      y: y + (Math.random() - 0.5) * 15,
+      vx: Math.cos(angle) * (2 + Math.random() * 3),
+      vy: Math.sin(angle) * (2 + Math.random() * 3),
       color: Math.random() > 0.5 ? "#ff6b6b" : "#ff4757",
-      radius: 1.5 + Math.random() * 1.5,
+      radius: 4 + Math.random() * 3,
       birth: Date.now(),
-      lifetime: 200 + Math.random() * 200,
+      lifetime: 250 + Math.random() * 250,
     });
   }
 }
@@ -118,16 +118,16 @@ export function spawnHealText(x: number, y: number) {
   });
 
   // Green heal sparkles
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 12; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const dist = 10 + Math.random() * 20;
+    const dist = 15 + Math.random() * 25;
     activeParticles.push({
       x: x + Math.cos(angle) * dist,
       y: y + Math.sin(angle) * dist,
-      vx: Math.cos(angle) * 0.5,
-      vy: -1 - Math.random() * 2,
+      vx: Math.cos(angle) * 0.8,
+      vy: -1.5 - Math.random() * 3,
       color: Math.random() > 0.5 ? "#55efc4" : "#00b894",
-      radius: 1.5 + Math.random() * 2,
+      radius: 4 + Math.random() * 4,
       birth: Date.now(),
       lifetime: 500 + Math.random() * 500,
     });
@@ -155,10 +155,26 @@ export function drawFloatingTexts(ctx: CanvasRenderingContext2D) {
 
     ctx.save();
     ctx.globalAlpha = alpha;
+    const r = p.radius * (0.5 + alpha * 0.5);
+
+    // Outer glow
     ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius * (0.5 + alpha * 0.5), 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, r * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = p.color + "22";
+    ctx.fill();
+
+    // Core
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fillStyle = p.color;
     ctx.fill();
+
+    // Bright center
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * 0.4, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+
     ctx.restore();
   }
 

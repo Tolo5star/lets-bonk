@@ -6,7 +6,7 @@ export const ARENA_CENTER_X = 0;
 export const ARENA_CENTER_Y = 0;
 
 // Player
-export const PLAYER_RADIUS = 20;
+export const PLAYER_RADIUS = 32;
 export const PLAYER_MAX_HP = 100;
 export const PLAYER_SPEED = 5; // units per tick
 export const PLAYER_FRICTION = 0.85;
@@ -54,7 +54,7 @@ export const BASIC_ENEMY_DAMAGE = 8;
 export const BASIC_ENEMY_TELEGRAPH_TICKS = 20; // 1s
 export const BASIC_ENEMY_ATTACK_RANGE = 40;
 export const BASIC_ENEMY_ATTACK_RECOVERY_TICKS = 20; // 1s
-export const BASIC_ENEMY_RADIUS = 18;
+export const BASIC_ENEMY_RADIUS = 28;
 
 // Charger enemy
 export const CHARGER_HP = 20;
@@ -63,7 +63,7 @@ export const CHARGER_CHARGE_SPEED = 12;
 export const CHARGER_DAMAGE = 15;
 export const CHARGER_TELEGRAPH_TICKS = 15; // 750ms
 export const CHARGER_RECOVERY_TICKS = 30; // 1.5s
-export const CHARGER_RADIUS = 16;
+export const CHARGER_RADIUS = 26;
 
 // Ranged enemy
 export const RANGED_HP = 15;
@@ -73,8 +73,8 @@ export const RANGED_PROJECTILE_SPEED = 6;
 export const RANGED_DAMAGE = 6;
 export const RANGED_FIRE_RATE_TICKS = 60; // 3s
 export const RANGED_TELEGRAPH_TICKS = 10; // 500ms
-export const RANGED_RADIUS = 14;
-export const PROJECTILE_RADIUS = 6;
+export const RANGED_RADIUS = 22;
+export const PROJECTILE_RADIUS = 8;
 
 // Mini boss
 export const MINI_BOSS_HP = 150;
@@ -82,7 +82,7 @@ export const MINI_BOSS_SPEED = 1.5;
 export const MINI_BOSS_DAMAGE = 20;
 export const MINI_BOSS_TELEGRAPH_TICKS = 25;
 export const MINI_BOSS_ATTACK_RANGE = 55;
-export const MINI_BOSS_RADIUS = 35;
+export const MINI_BOSS_RADIUS = 50;
 
 // Timing
 export const TICK_RATE = 20; // Hz

@@ -165,37 +165,12 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
     };
   }, [tryMountTouch]);
 
-  // Portrait rotation warning
-  const [isPortrait, setIsPortrait] = useState(
-    isTouch && window.innerHeight > window.innerWidth
-  );
-  useEffect(() => {
-    if (!isTouch) return;
-    const check = () => setIsPortrait(window.innerHeight > window.innerWidth);
-    window.addEventListener("resize", check);
-    window.addEventListener("orientationchange", check);
-    return () => {
-      window.removeEventListener("resize", check);
-      window.removeEventListener("orientationchange", check);
-    };
-  }, [isTouch]);
-
   // Cleanup input on unmount
   useEffect(() => {
     return () => {
       inputRef.current?.destroy();
     };
   }, []);
-
-  if (isTouch && isPortrait) {
-    return (
-      <div style={styles.rotateScreen}>
-        <div style={{ fontSize: "3rem" }}>📱</div>
-        <div style={styles.rotateText}>Rotate your phone!</div>
-        <div style={styles.rotateSubtext}>Two thumbs, two players, one chaos</div>
-      </div>
-    );
-  }
 
   // Mobile layout: fullscreen canvas + overlaid controls
   if (isTouch) {
@@ -269,20 +244,8 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 5,
   },
 
-  // Rotate screen
-  rotateScreen: {
-    width: "100%",
-    height: "100%",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#1a1a2e",
-    gap: "12px",
-  },
-  rotateText: {
+  rotateText: { // unused, kept to avoid cleanup noise
     fontFamily: "monospace",
-    fontWeight: "bold",
     fontSize: "1.2rem",
     color: "#4ecdc4",
   },
