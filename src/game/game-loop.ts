@@ -140,6 +140,8 @@ export class GameLoop {
 
   private update() {
     if (!this.running) return;
+    // Freeze game during power-up selection (enemies stop, no damage)
+    if (this.powerUpPending) return;
 
     // 0. Read inputs right before processing (no drift from separate interval)
     if (this.preTick) this.preTick();
@@ -234,8 +236,6 @@ export class GameLoop {
           this.emit("powerup_available");
         }
       }
-      // Don't advance to next wave while power-up selection is pending
-      if (this.powerUpPending) return;
       if (this.waveCooldownTicks >= this.WAVE_COOLDOWN) {
         this.waveCooldownTicks = 0;
         this.spawner.startWave();
