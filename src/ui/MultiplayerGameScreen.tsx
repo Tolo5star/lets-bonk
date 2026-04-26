@@ -178,12 +178,15 @@ export function MultiplayerGameScreen({
               toast(randomFrom(["SPLAT!", "BONKED!"]), "#ffeaa7");
             }
             if (msg.eventType === "attack_triggered") {
-              const d = msg.data as { type: string; hitbox: { x: number; y: number; range: number; angle: number } };
-              spawnAttackText(
-                d.hitbox.x + Math.cos(d.hitbox.angle) * d.hitbox.range * 0.5,
-                d.hitbox.y + Math.sin(d.hitbox.angle) * d.hitbox.range * 0.5,
-                d.type === "heavy"
-              );
+              // If we're the fighter, we already predicted this locally — skip to avoid double sparks
+              if (role !== "fighter") {
+                const d = msg.data as { type: string; hitbox: { x: number; y: number; range: number; angle: number } };
+                spawnAttackText(
+                  d.hitbox.x + Math.cos(d.hitbox.angle) * d.hitbox.range * 0.5,
+                  d.hitbox.y + Math.sin(d.hitbox.angle) * d.hitbox.range * 0.5,
+                  d.type === "heavy"
+                );
+              }
             }
             if (msg.eventType === "heal_success") {
               toast("HEALED! +30", "#55efc4");
@@ -304,13 +307,49 @@ export function MultiplayerGameScreen({
       game.start();
     } else {
       // === GUEST: send inputs + interpolate snapshots ===
+
+      // Track attack state for local prediction
+      let wasAttackHeld = false;
+
       inputInterval = window.setInterval(() => {
         if (role === "mover") {
-          transport.send({ type: "input", mover: input.getMoverInput() });
+          const moverIn = input.getMoverInput();
+          transport.send({ type: "input", mover: moverIn });
+
+          // Predict dash visual: instant screen feedback
+          if (moverIn.dash) {
+            renderer.triggerScreenShake(2);
+          }
         } else {
-          transport.send({ type: "input", fighter: input.getFighterInput() });
+          const fighterIn = input.getFighterInput();
+          transport.send({ type: "input", fighter: fighterIn });
+
+          // LOCAL ATTACK PREDICTION — show visual instantly, don't wait for host
+          // Predict attack release (light or heavy attack fires)
+          if (fighterIn.attackRelease && wasAttackHeld) {
+            const snap = interpolator?.get();
+            if (snap) {
+              const isHeavy = wasAttackHeld && (performance.now() - attackHoldStart) > 800;
+              const range = isHeavy ? 100 : 80;
+              // Spawn sparks at predicted hit location
+              spawnAttackText(
+                snap.player.x + Math.cos(snap.player.angle) * range * 0.5,
+                snap.player.y + Math.sin(snap.player.angle) * range * 0.5,
+                isHeavy
+              );
+              renderer.triggerScreenShake(isHeavy ? 4 : 2);
+            }
+          }
+
+          // Track hold state for heavy detection
+          if (fighterIn.attackStart) {
+            attackHoldStart = performance.now();
+          }
+          wasAttackHeld = fighterIn.attackHold;
         }
       }, TICK_MS);
+
+      let attackHoldStart = 0;
 
       // Feed interpolated snapshots to renderer at 60fps
       snapshotInterval = window.setInterval(() => {
