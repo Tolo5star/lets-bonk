@@ -90,6 +90,7 @@ export interface EnemySnapshot {
   angle: number;
   telegraphProgress: number;
   radius: number;
+  enraged: boolean;
 }
 
 export interface ProjectileSnapshot {

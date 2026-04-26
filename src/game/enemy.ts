@@ -26,6 +26,9 @@ import {
   MINI_BOSS_DAMAGE,
   MINI_BOSS_TELEGRAPH_TICKS,
   MINI_BOSS_ATTACK_RANGE,
+  MINI_BOSS_ENRAGE_HP_RATIO,
+  MINI_BOSS_ENRAGE_SPEED_MULT,
+  MINI_BOSS_ENRAGE_DAMAGE_MULT,
   MINI_BOSS_RADIUS,
   ARENA_RADIUS,
   STUN_DURATION_TICKS,
@@ -64,9 +67,13 @@ export class Enemy {
   dead = false;
   deathTimer = 0;
 
+  enraged = false; // boss phase 2
+
   // Type-specific
   private speed: number;
+  private baseSpeed: number;
   private damage: number;
+  private baseDamage: number;
   private telegraphTicks: number;
   private attackRange: number;
   private recoveryTicks: number;
@@ -126,6 +133,8 @@ export class Enemy {
         this.fireRateTicks = 0;
         break;
     }
+    this.baseSpeed = this.speed;
+    this.baseDamage = this.damage;
   }
 
   private distTo(px: number, py: number): number {
@@ -146,6 +155,17 @@ export class Enemy {
       this.state = EnemyState.Dying;
       this.stateTimer = 0;
       return;
+    }
+
+    // Boss enrage at 50% HP
+    if (
+      this.type === EnemyType.MiniBoss &&
+      !this.enraged &&
+      this.hp / this.maxHp <= MINI_BOSS_ENRAGE_HP_RATIO
+    ) {
+      this.enraged = true;
+      this.speed = this.baseSpeed * MINI_BOSS_ENRAGE_SPEED_MULT;
+      this.damage = this.baseDamage * MINI_BOSS_ENRAGE_DAMAGE_MULT;
     }
 
     // Apply knockback
@@ -412,6 +432,7 @@ export class Enemy {
           ? this.stateTimer / this.telegraphTicks
           : 0,
       radius: this.radius,
+      enraged: this.enraged,
     };
   }
 }

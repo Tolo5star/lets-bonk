@@ -5,12 +5,12 @@ import { ARENA_RADIUS } from "./constants";
 interface WaveDefinition {
   groups: Array<{
     enemies: Array<{ type: EnemyType; count: number }>;
-    delayTicks: number; // ticks after wave start to spawn this group
+    delayTicks: number;
   }>;
 }
 
 const WAVES: WaveDefinition[] = [
-  // Wave 1: Easy - just basics
+  // Wave 1: "We got this" — confidence + laughter
   {
     groups: [
       {
@@ -19,11 +19,11 @@ const WAVES: WaveDefinition[] = [
       },
       {
         enemies: [{ type: EnemyType.Basic, count: 2 }],
-        delayTicks: 80, // 4s later
+        delayTicks: 80,
       },
     ],
   },
-  // Wave 2: Mixed
+  // Wave 2: "Oh… okay" — introduce charger, forces repositioning
   {
     groups: [
       {
@@ -35,20 +35,66 @@ const WAVES: WaveDefinition[] = [
       },
       {
         enemies: [
+          { type: EnemyType.Charger, count: 2 },
+        ],
+        delayTicks: 80,
+      },
+    ],
+  },
+  // Wave 3: "WAIT WHAT" — ranged introduced, first real coordination check
+  {
+    groups: [
+      {
+        enemies: [
           { type: EnemyType.Ranged, count: 2 },
+          { type: EnemyType.Basic, count: 1 },
+        ],
+        delayTicks: 0,
+      },
+      {
+        enemies: [
+          { type: EnemyType.Charger, count: 1 },
+          { type: EnemyType.Ranged, count: 1 },
         ],
         delayTicks: 60,
       },
       {
         enemies: [
-          { type: EnemyType.Charger, count: 2 },
-          { type: EnemyType.Basic, count: 1 },
+          { type: EnemyType.Basic, count: 2 },
+          { type: EnemyType.Ranged, count: 1 },
         ],
         delayTicks: 120,
       },
     ],
   },
-  // Wave 3: Mini boss
+  // Wave 4: "THIS IS TOO MUCH" — swarm, chaos peak, heal becomes critical
+  {
+    groups: [
+      {
+        enemies: [
+          { type: EnemyType.Basic, count: 3 },
+          { type: EnemyType.Charger, count: 2 },
+        ],
+        delayTicks: 0,
+      },
+      {
+        enemies: [
+          { type: EnemyType.Ranged, count: 2 },
+          { type: EnemyType.Basic, count: 2 },
+        ],
+        delayTicks: 50,
+      },
+      {
+        enemies: [
+          { type: EnemyType.Charger, count: 2 },
+          { type: EnemyType.Ranged, count: 1 },
+          { type: EnemyType.Basic, count: 1 },
+        ],
+        delayTicks: 100,
+      },
+    ],
+  },
+  // Wave 5: BOSS — epic finish
   {
     groups: [
       {
@@ -56,24 +102,48 @@ const WAVES: WaveDefinition[] = [
         delayTicks: 0,
       },
       {
-        enemies: [
-          { type: EnemyType.Basic, count: 2 },
-        ],
-        delayTicks: 60,
+        // Phase 1 minions
+        enemies: [{ type: EnemyType.Basic, count: 2 }],
+        delayTicks: 80,
       },
       {
+        // Phase 2 pressure
         enemies: [
+          { type: EnemyType.Charger, count: 1 },
           { type: EnemyType.Ranged, count: 1 },
+        ],
+        delayTicks: 160,
+      },
+      {
+        // Final push
+        enemies: [
+          { type: EnemyType.Basic, count: 2 },
           { type: EnemyType.Charger, count: 1 },
         ],
-        delayTicks: 120,
+        delayTicks: 240,
       },
     ],
   },
 ];
 
+// Funny wave intro texts
+export const WAVE_INTROS: string[] = [
+  "Let's go!",          // Wave 1
+  "Oh... okay 😅",      // Wave 2
+  "WAIT WHAT?!",         // Wave 3
+  "THIS IS TOO MUCH 😱", // Wave 4
+  "BOSS FIGHT 🐉",      // Wave 5
+];
+
+export const WAVE_TAUNTS: string[][] = [
+  ["You got this!", "Easy peasy!", "Warm up time!"],
+  ["They look angry...", "MOVE MOVE MOVE!", "Here they come!"],
+  ["They're SHOOTING?!", "Duck and bonk!", "Coordination time!"],
+  ["YOU'RE STILL ALIVE??", "It gets worse 😈", "Heal or die!"],
+  ["This is the big one...", "FINAL BOSS", "Together or not at all!"],
+];
+
 function randomSpawnPosition(): { x: number; y: number } {
-  // Spawn on the arena edge
   const angle = Math.random() * Math.PI * 2;
   const dist = ARENA_RADIUS * 0.85;
   return {
@@ -95,6 +165,15 @@ export class EnemySpawner {
 
   get totalWaves(): number {
     return WAVES.length;
+  }
+
+  get waveIntro(): string {
+    return WAVE_INTROS[this.waveIndex] || "";
+  }
+
+  get waveTaunt(): string {
+    const taunts = WAVE_TAUNTS[this.waveIndex] || ["..."];
+    return taunts[Math.floor(Math.random() * taunts.length)];
   }
 
   startWave() {
@@ -128,7 +207,6 @@ export class EnemySpawner {
       }
     }
 
-    // Check if wave is complete (all groups spawned and all enemies dead)
     const allGroupsSpawned = this.spawnedGroups.size === wave.groups.length;
     if (allGroupsSpawned && activeEnemyCount === 0 && spawned.length === 0) {
       this.waveActive = false;

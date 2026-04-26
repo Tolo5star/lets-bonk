@@ -8,6 +8,17 @@ interface ScoreScreenProps {
   onPlayAgain: () => void;
 }
 
+function getTeamTitle(scores: ScoreData, won: boolean): string {
+  if (!won && scores.survivalTimeMs < 30000) return "Speedrun to Defeat";
+  if (!won && scores.healSuccesses === 0) return "Healing? Never Heard Of It";
+  if (!won) return "Certified Button Mashers";
+  if (scores.damageTaken < 30) return "Untouchable Duo";
+  if (scores.healSuccesses >= 3) return "Trust-Based Relationship";
+  if (scores.enemiesKilled > 20) return "Professional Bonkers";
+  if (scores.damageTaken > 150) return "Barely Survived";
+  return "Chaos Champions";
+}
+
 export function ScoreScreen({ scores, won, onPlayAgain }: ScoreScreenProps) {
   const survivalSec = Math.floor(scores.survivalTimeMs / 1000);
   const survivalMin = Math.floor(survivalSec / 60);
@@ -18,9 +29,10 @@ export function ScoreScreen({ scores, won, onPlayAgain }: ScoreScreenProps) {
       ? `${scores.healSuccesses}/${scores.healAttempts}`
       : "0/0";
 
+  const teamTitle = getTeamTitle(scores, won);
+
   return (
     <div style={s.container}>
-      {/* Decorative corner blobs */}
       <div style={s.blobTopRight} />
       <div style={s.blobBottomLeft} />
 
@@ -32,7 +44,9 @@ export function ScoreScreen({ scores, won, onPlayAgain }: ScoreScreenProps) {
           {won ? "You bonked every last one of them!" : "You got bonked"}
         </p>
 
-        {/* Stats grid — always compact */}
+        <div style={s.teamTitle}>{teamTitle}</div>
+
+        {/* Stats grid */}
         <div style={s.statsGrid}>
           <StatChip
             value={`${scores.damageDealt}`}
@@ -149,8 +163,19 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: "0.95rem",
     fontWeight: 700,
     color: colors.textMuted,
-    marginBottom: "1.2rem",
+    marginBottom: "0.5rem",
     fontStyle: "italic",
+  },
+  teamTitle: {
+    fontFamily: fonts.display,
+    fontSize: "clamp(1rem, 3.5vw, 1.4rem)",
+    color: colors.pink,
+    textShadow: shadows.textGlow("rgba(255,107,157,0.3)"),
+    marginBottom: "1rem",
+    padding: "4px 16px",
+    background: colors.pink + "12",
+    borderRadius: "8px",
+    border: `1px solid ${colors.pink}33`,
   },
   statsGrid: {
     display: "grid",

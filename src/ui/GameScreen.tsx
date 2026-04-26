@@ -127,10 +127,25 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
           break;
         }
         case "wave_start": {
-          const d = event.data as { wave: number };
+          const d = event.data as { wave: number; intro: string };
           toast(`WAVE ${d.wave}`, "#ffeaa7");
+          if (d.intro) {
+            setTimeout(() => toast(d.intro, "#fff"), 600);
+          }
           break;
         }
+        case "wave_pause": {
+          const d = event.data as { taunt: string };
+          toast(d.taunt, "rgba(255,255,255,0.8)");
+          break;
+        }
+        case "boss_enraged":
+          renderer.triggerScreenShake(12);
+          toast("IT GOT ANGRY!! 😡", "#ff4757");
+          break;
+        case "player_low_hp":
+          // Pulse is handled by renderer vignette
+          break;
       }
     });
 

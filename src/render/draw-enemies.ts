@@ -68,6 +68,18 @@ function drawEnemy(ctx: CanvasRenderingContext2D, enemy: EnemySnapshot) {
     ctx.fill();
   }
 
+  // Enrage glow (boss phase 2)
+  if (enemy.enraged) {
+    const pulse = 0.3 + Math.sin(t * 6) * 0.15;
+    ctx.beginPath();
+    ctx.arc(0, 0, enemy.radius + 12, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 50, 50, ${pulse * 0.15})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255, 80, 80, ${pulse})`;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
   // Shadow
   ctx.beginPath();
   ctx.ellipse(0, enemy.radius * 0.5, enemy.radius * 0.7, enemy.radius * 0.15, 0, 0, Math.PI * 2);

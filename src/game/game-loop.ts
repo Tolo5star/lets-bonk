@@ -15,11 +15,14 @@ import {
 export type GameEventType =
   | "wave_start"
   | "wave_complete"
+  | "wave_pause"
   | "game_over"
   | "game_won"
   | "player_hit"
+  | "player_low_hp"
   | "enemy_hit"
   | "enemy_killed"
+  | "boss_enraged"
   | "heal_success"
   | "block_activated"
   | "attack_triggered";
@@ -172,20 +175,44 @@ export class GameLoop {
     const newEnemies = this.spawner.tick(aliveEnemies);
     this.enemies.push(...newEnemies);
 
-    // Wave cooldown between waves
+    // Wave cooldown between waves (micro-pause)
     if (!this.spawner.waveActive && !this.spawner.allWavesComplete) {
       this.waveCooldownTicks++;
+      // Emit pause event at start of cooldown
+      if (this.waveCooldownTicks === 1) {
+        this.score.wavesCompleted++;
+        this.emit("wave_pause", {
+          nextWave: this.spawner.currentWave,
+          taunt: this.spawner.waveTaunt,
+        });
+      }
       if (this.waveCooldownTicks >= this.WAVE_COOLDOWN) {
         this.waveCooldownTicks = 0;
-        const prevWave = this.spawner.currentWave;
         this.spawner.startWave();
-        this.score.wavesCompleted++;
-        this.emit("wave_complete", { wave: prevWave });
-        this.emit("wave_start", { wave: this.spawner.currentWave });
+        this.emit("wave_start", {
+          wave: this.spawner.currentWave,
+          intro: this.spawner.waveIntro,
+        });
       }
     }
 
-    // 8. Check win/lose
+    // Check boss enrage
+    for (const enemy of this.enemies) {
+      if (enemy.type === 3 && enemy.enraged && !enemy.dead) {
+        // Only emit once per boss via a flag check
+        if (!(enemy as any)._enrageEmitted) {
+          (enemy as any)._enrageEmitted = true;
+          this.emit("boss_enraged");
+        }
+      }
+    }
+
+    // 8. Low HP warning
+    if (this.player.hp > 0 && this.player.hp <= 25 && this.tick % 20 === 0) {
+      this.emit("player_low_hp");
+    }
+
+    // 9. Check win/lose
     if (this.player.hp <= 0) {
       this.gameOver = true;
       this.running = false;

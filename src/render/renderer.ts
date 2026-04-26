@@ -117,6 +117,22 @@ export class Renderer {
     this.ctx.save();
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     drawHUD(this.ctx, snapshot, w, h);
+
+    // Near-death red vignette
+    if (snapshot.player.hp > 0 && snapshot.player.hp <= 30) {
+      const intensity = 1 - snapshot.player.hp / 30; // 0 at 30hp, 1 at 0hp
+      const pulse = 0.5 + Math.sin(Date.now() * 0.004) * 0.3;
+      const alpha = intensity * pulse * 0.35;
+      const gradient = this.ctx.createRadialGradient(
+        w / 2, h / 2, w * 0.3,
+        w / 2, h / 2, w * 0.7
+      );
+      gradient.addColorStop(0, "rgba(255, 0, 0, 0)");
+      gradient.addColorStop(1, `rgba(180, 0, 0, ${alpha})`);
+      this.ctx.fillStyle = gradient;
+      this.ctx.fillRect(0, 0, w, h);
+    }
+
     this.ctx.restore();
   }
 
