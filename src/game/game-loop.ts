@@ -293,7 +293,7 @@ export class GameLoop {
     }
 
     if (result.attackTriggered) {
-      const hitbox = createAttackHitbox(this.player, result.attackTriggered);
+      const hitbox = createAttackHitbox(this.player, result.attackTriggered, this.enemies);
       this.emit("attack_triggered", {
         type: result.attackTriggered,
         hitbox,
