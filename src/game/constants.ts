@@ -19,24 +19,24 @@ export const DASH_COOLDOWN_TICKS = 40; // 2s
 // Light attack
 export const LIGHT_ATTACK_DAMAGE = 10;
 export const LIGHT_ATTACK_KNOCKBACK = 6;
-export const LIGHT_ATTACK_RANGE = 65;
-export const LIGHT_ATTACK_ARC = Math.PI * 0.65; // wider arc
+export const LIGHT_ATTACK_RANGE = 80;
+export const LIGHT_ATTACK_ARC = Math.PI * 0.7; // wide arc
 export const LIGHT_ATTACK_RECOVERY_TICKS = 8; // 400ms
 
 // Heavy attack
 export const HEAVY_ATTACK_CHARGE_TICKS = 20; // 1s
 export const HEAVY_ATTACK_DAMAGE = 25;
 export const HEAVY_ATTACK_KNOCKBACK = 12;
-export const HEAVY_ATTACK_RANGE = 80;
-export const HEAVY_ATTACK_ARC = Math.PI * 0.9; // big wide arc
+export const HEAVY_ATTACK_RANGE = 100;
+export const HEAVY_ATTACK_ARC = Math.PI; // full semicircle
 export const HEAVY_ATTACK_RECOVERY_TICKS = 14; // 700ms
 export const HEAVY_ATTACK_SELF_RECOIL = 5;
 
 // Block
-export const BLOCK_CHARGE_TICKS = 40; // 2s
+export const BLOCK_CHARGE_TICKS = 20; // 1s (was 2s — faster to activate)
 export const BLOCK_ACTIVE_TICKS = 30; // 1.5s
 export const BLOCK_DAMAGE_REDUCTION = 0.8; // 80% damage reduced
-export const BLOCK_COOLDOWN_TICKS = 60; // 3s
+export const BLOCK_COOLDOWN_TICKS = 40; // 2s (was 3s — less downtime)
 export const BLOCK_KNOCKBACK_RESIST = 0.3; // 70% knockback reduced
 
 // Heal
