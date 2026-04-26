@@ -163,21 +163,47 @@ export function MultiplayerGameScreen({
           break;
 
         case "event":
-          // Guest: trigger local feedback
+          // Guest: trigger local feedback (effects + particles)
           if (!isHost) {
-            if (msg.eventType === "player_hit") renderer.triggerScreenShake(8);
+            if (msg.eventType === "player_hit") {
+              renderer.triggerScreenShake(8);
+              toast(randomFrom(["OOF", "BONK!", "OUCH"]), "#ff6b6b");
+              // Spawn damage particles at player position from latest snapshot
+              const latestSnap = interpolator?.get();
+              if (latestSnap) spawnDamageText(latestSnap.player.x, latestSnap.player.y, 8);
+            }
             if (msg.eventType === "enemy_hit") renderer.triggerScreenShake(3);
-            if (msg.eventType === "enemy_killed") renderer.triggerScreenShake(5);
-            if (msg.eventType === "heal_success") toast("HEALED! +30", "#55efc4");
+            if (msg.eventType === "enemy_killed") {
+              renderer.triggerScreenShake(5);
+              toast(randomFrom(["SPLAT!", "BONKED!"]), "#ffeaa7");
+            }
+            if (msg.eventType === "attack_triggered") {
+              const d = msg.data as { type: string; hitbox: { x: number; y: number; range: number; angle: number } };
+              spawnAttackText(
+                d.hitbox.x + Math.cos(d.hitbox.angle) * d.hitbox.range * 0.5,
+                d.hitbox.y + Math.sin(d.hitbox.angle) * d.hitbox.range * 0.5,
+                d.type === "heavy"
+              );
+            }
+            if (msg.eventType === "heal_success") {
+              toast("HEALED! +30", "#55efc4");
+              const snap = interpolator?.get();
+              if (snap) spawnHealText(snap.player.x, snap.player.y);
+            }
             if (msg.eventType === "block_activated") toast("SHIELD UP!", "#74b9ff");
             if (msg.eventType === "wave_start") {
-              const d = msg.data as { wave: number };
+              const d = msg.data as { wave: number; intro: string };
               toast(`WAVE ${d.wave}`, "#ffeaa7");
+              if (d.intro) setTimeout(() => toast(d.intro, "#fff"), 600);
             }
-            if (msg.eventType === "player_hit")
-              toast(randomFrom(["OOF", "BONK!", "OUCH"]), "#ff6b6b");
-            if (msg.eventType === "enemy_killed")
-              toast(randomFrom(["SPLAT!", "BONKED!"]), "#ffeaa7");
+            if (msg.eventType === "wave_pause") {
+              const d = msg.data as { taunt: string };
+              toast(d.taunt, "rgba(255,255,255,0.8)");
+            }
+            if (msg.eventType === "boss_enraged") {
+              renderer.triggerScreenShake(12);
+              toast("IT GOT ANGRY!! 😡", "#ff4757");
+            }
           }
           break;
 

@@ -19,7 +19,7 @@ export class TouchButton {
     element.style.userSelect = "none";
     element.style.webkitUserSelect = "none";
     element.style.pointerEvents = "auto";
-    element.style.transition = "transform 0.1s ease";
+    element.style.transition = "transform 0.06s ease-out";
 
     element.addEventListener("pointerdown", this.onDown);
     element.addEventListener("pointerup", this.onUp);
@@ -37,14 +37,14 @@ export class TouchButton {
     this.pressStart = performance.now();
     this.holdDuration = 0;
 
-    // Wobble effect!
-    this.element.style.transform = "scale(0.88) rotate(-3deg)";
+    // Instant press feedback
+    this.element.style.transform = "scale(0.9) rotate(-2deg)";
     if (this.wobbleTimeout) clearTimeout(this.wobbleTimeout);
     this.wobbleTimeout = window.setTimeout(() => {
       if (this.isDown) {
-        this.element.style.transform = "scale(0.92) rotate(1deg)";
+        this.element.style.transform = "scale(0.93)";
       }
-    }, 80);
+    }, 50);
 
     // Haptic feedback
     if (navigator.vibrate) {
@@ -59,12 +59,12 @@ export class TouchButton {
     this.justReleased = true;
     this.holdDuration = performance.now() - this.pressStart;
 
-    // Bounce back with overshoot wobble
-    this.element.style.transform = "scale(1.06) rotate(2deg)";
+    // Bounce back
+    this.element.style.transform = "scale(1.04)";
     if (this.wobbleTimeout) clearTimeout(this.wobbleTimeout);
     this.wobbleTimeout = window.setTimeout(() => {
-      this.element.style.transform = "scale(1) rotate(0deg)";
-    }, 100);
+      this.element.style.transform = "scale(1)";
+    }, 60);
   };
 
   /** Call once per tick to read and clear one-shot flags */
