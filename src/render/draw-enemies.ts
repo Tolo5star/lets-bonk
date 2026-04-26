@@ -33,19 +33,66 @@ function drawEnemy(ctx: CanvasRenderingContext2D, enemy: EnemySnapshot) {
   // Telegraph warning
   if (enemy.state === EnemyState.Telegraph) {
     const progress = enemy.telegraphProgress;
-    // Pulsing red ring
-    const ringR = enemy.radius + 12 + Math.sin(progress * Math.PI * 6) * 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, ringR, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255, 80, 80, ${0.2 + progress * 0.5})`;
-    ctx.lineWidth = 2 + progress * 3;
-    ctx.stroke();
 
-    // Exclamation mark
-    ctx.fillStyle = `rgba(255, 80, 80, ${0.5 + progress * 0.5})`;
-    ctx.font = `bold ${12 + progress * 6}px sans-serif`;
-    ctx.textAlign = "center";
-    ctx.fillText("!", 0, -enemy.radius - 10);
+    if (enemy.type === EnemyType.MiniBoss) {
+      // Boss: ground slam telegraph — danger zone circle on the ground
+      const slamRadius = 110; // matches MINI_BOSS_ATTACK_RANGE
+      const pulseR = slamRadius * (0.3 + progress * 0.7);
+
+      // Expanding danger fill
+      ctx.beginPath();
+      ctx.arc(0, 0, pulseR, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 40, 40, ${0.05 + progress * 0.12})`;
+      ctx.fill();
+
+      // Danger ring
+      ctx.beginPath();
+      ctx.arc(0, 0, pulseR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 60, 60, ${0.3 + progress * 0.5})`;
+      ctx.lineWidth = 3 + progress * 4;
+      ctx.setLineDash([8, 6]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Inner pulse ring
+      ctx.beginPath();
+      ctx.arc(0, 0, pulseR * 0.5, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 100, 50, ${progress * 0.4})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Big warning text
+      ctx.fillStyle = `rgba(255, 60, 60, ${0.5 + progress * 0.5})`;
+      ctx.font = `bold ${16 + progress * 10}px 'Lilita One', sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("SLAM!", 0, -enemy.radius - 18);
+    } else {
+      // Normal enemies: pulsing red ring + exclamation
+      const ringR = enemy.radius + 12 + Math.sin(progress * Math.PI * 6) * 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 80, 80, ${0.2 + progress * 0.5})`;
+      ctx.lineWidth = 2 + progress * 3;
+      ctx.stroke();
+
+      ctx.fillStyle = `rgba(255, 80, 80, ${0.5 + progress * 0.5})`;
+      ctx.font = `bold ${12 + progress * 6}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("!", 0, -enemy.radius - 10);
+    }
+  }
+
+  // Boss recovery: shockwave ring expanding outward (after slam lands)
+  if (enemy.type === EnemyType.MiniBoss && enemy.state === EnemyState.Recovery) {
+    const recoverAge = Math.min(1, (Date.now() * 0.001 % 1)); // crude timer
+    // Use stateTimer-like approach via animation time
+    const waveR = 110 * (0.3 + recoverAge * 0.7);
+    const alpha = Math.max(0, 0.4 - recoverAge * 0.4);
+    ctx.beginPath();
+    ctx.arc(0, 0, waveR, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 150, 50, ${alpha})`;
+    ctx.lineWidth = 4;
+    ctx.stroke();
   }
 
   // Charger trail

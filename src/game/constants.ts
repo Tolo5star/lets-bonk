@@ -79,9 +79,9 @@ export const PROJECTILE_RADIUS = 8;
 // Mini boss
 export const MINI_BOSS_HP = 250;
 export const MINI_BOSS_SPEED = 1.5;
-export const MINI_BOSS_DAMAGE = 18;
-export const MINI_BOSS_TELEGRAPH_TICKS = 25;
-export const MINI_BOSS_ATTACK_RANGE = 70;
+export const MINI_BOSS_DAMAGE = 22;
+export const MINI_BOSS_TELEGRAPH_TICKS = 22;
+export const MINI_BOSS_ATTACK_RANGE = 110;
 export const MINI_BOSS_RADIUS = 55;
 export const MINI_BOSS_ENRAGE_HP_RATIO = 0.5; // enrages at 50% HP
 export const MINI_BOSS_ENRAGE_SPEED_MULT = 1.6;

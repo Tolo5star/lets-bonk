@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { ScoreData } from "../game/types";
 import { isTouchDevice } from "../input/detect-device";
 import { colors, fonts, shadows } from "./theme";
@@ -36,9 +37,16 @@ export function ScoreScreen({ scores, won, onPlayAgain }: ScoreScreenProps) {
       <div style={s.blobTopRight} />
       <div style={s.blobBottomLeft} />
 
+      {/* Confetti for win */}
+      {won && <Confetti />}
+
       <div style={s.scrollArea}>
-        <h1 style={s.title}>
-          {won ? "You Won!" : "Game Over"}
+        <h1 style={{
+          ...s.title,
+          color: won ? colors.green : colors.yellow,
+          fontSize: won ? "clamp(2.5rem, 8vw, 4rem)" : s.title.fontSize,
+        }}>
+          {won ? "YOU WON!!" : "Game Over"}
         </h1>
         <p style={s.subtitle}>
           {won ? "You bonked every last one of them!" : "You got bonked"}
@@ -252,3 +260,85 @@ const s: Record<string, React.CSSProperties> = {
     zIndex: 0,
   },
 };
+
+// Canvas-based confetti for the win screen
+function Confetti() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const confettiColors = [
+      colors.pink, colors.blue, colors.green, colors.yellow,
+      colors.orange, colors.purple, "#fff",
+    ];
+
+    interface Piece {
+      x: number; y: number; vx: number; vy: number;
+      r: number; color: string; spin: number; spinSpeed: number;
+    }
+
+    const pieces: Piece[] = [];
+    for (let i = 0; i < 80; i++) {
+      pieces.push({
+        x: Math.random() * w,
+        y: -20 - Math.random() * h * 0.5,
+        vx: (Math.random() - 0.5) * 3,
+        vy: 1.5 + Math.random() * 3,
+        r: 3 + Math.random() * 5,
+        color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
+        spin: Math.random() * Math.PI * 2,
+        spinSpeed: (Math.random() - 0.5) * 0.15,
+      });
+    }
+
+    let animId: number;
+    const draw = () => {
+      ctx.clearRect(0, 0, w, h);
+      let alive = false;
+      for (const p of pieces) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.04;
+        p.vx *= 0.99;
+        p.spin += p.spinSpeed;
+
+        if (p.y < h + 20) alive = true;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.spin);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.r, -p.r * 0.4, p.r * 2, p.r * 0.8);
+        ctx.restore();
+      }
+      if (alive) animId = requestAnimationFrame(draw);
+    };
+    animId = requestAnimationFrame(draw);
+
+    return () => cancelAnimationFrame(animId);
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        zIndex: 10,
+      }}
+    />
+  );
+}
