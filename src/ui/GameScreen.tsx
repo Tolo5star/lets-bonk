@@ -215,7 +215,9 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
       game.stop();
       renderer.destroy();
     };
-  }, [tryMountTouch, phase, selectedMod]);
+  // phase and selectedMod intentionally excluded — game only starts once
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tryMountTouch]);
 
   // Cleanup input on unmount
   useEffect(() => {
