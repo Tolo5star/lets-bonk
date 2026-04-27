@@ -44,6 +44,8 @@ export function MultiplayerGameScreen({
   type MPPhase = "modifier_select" | "playing" | "powerup_select";
   const [phase, setPhase] = useState<MPPhase>(isHost ? "modifier_select" : "modifier_select");
   const [modChoices, setModChoices] = useState<RunModifier[]>(() => isHost ? pickModifierChoices(3) : []);
+  const modChoicesRef = useRef<RunModifier[]>([]);
+  modChoicesRef.current = modChoices;
   const [powerUpChoices, setPowerUpChoices] = useState<PowerUp[]>([]);
   const gameRef = useRef<GameLoop | null>(null);
   const [gameStartTrigger, setGameStartTrigger] = useState<ReturnType<typeof defaultConfig> | null>(null);
@@ -224,46 +226,6 @@ export function MultiplayerGameScreen({
 
         case "scores":
           onGameOverRef.current(msg.scores, msg.won);
-          break;
-
-        case "modifier_choices":
-          // Guest: receive choices from host, show read-only view
-          if (!isHost) {
-            setModChoices(getModifiersByIds(msg.choiceIds));
-            setPhase("modifier_select");
-          }
-          break;
-
-        case "modifier_selected": {
-          // Guest: host picked, apply same config and start game
-          if (!isHost) {
-            const choices = modChoices;
-            const picked = choices[msg.choiceIndex];
-            if (picked) {
-              const config = defaultConfig();
-              picked.apply(config);
-              setGameStartTrigger(config);
-            } else {
-              setGameStartTrigger(defaultConfig());
-            }
-            setPhase("playing");
-          }
-          break;
-        }
-
-        case "powerup_choices":
-          // Guest: show read-only power-up choices
-          if (!isHost) {
-            setPowerUpChoices(getPowerUpsByIds(msg.choiceIds));
-            setPhase("powerup_select");
-          }
-          break;
-
-        case "powerup_selected":
-          // Guest: host picked, dismiss overlay
-          if (!isHost) {
-            setPhase("playing");
-          }
           break;
 
         case "peer_left":
@@ -467,15 +429,54 @@ export function MultiplayerGameScreen({
     return () => { inputRef.current?.destroy(); };
   }, []);
 
-  // Host: send modifier choices to guest as soon as they're available
+  // Host: send modifier choices to guest immediately
   useEffect(() => {
-    if (isHost && modChoices.length > 0 && phase === "modifier_select") {
+    if (isHost && modChoices.length > 0) {
       transport.send({ type: "modifier_choices", choiceIds: modChoices.map(m => m.id) });
     }
-  }, [isHost, modChoices, phase, transport]);
+  }, [isHost, modChoices, transport]);
 
-  // Guest: listen for modifier_choices and modifier_selected via netHandler (done in main effect)
+  // Guest: pre-game listener for modifier/powerup sync — must run independently of game start
+  useEffect(() => {
+    if (isHost) return; // host doesn't need this
 
+    const preGameHandler = (msg: NetMessage) => {
+      if (msg.type === "modifier_choices") {
+        setModChoices(getModifiersByIds(msg.choiceIds));
+        setPhase("modifier_select");
+      }
+      if (msg.type === "modifier_selected") {
+        const choices = modChoicesRef.current;
+        const picked = choices[msg.choiceIndex];
+        const config = defaultConfig();
+        if (picked) picked.apply(config);
+        setGameStartTrigger(config);
+        setPhase("playing");
+      }
+      if (msg.type === "powerup_choices") {
+        setPowerUpChoices(getPowerUpsByIds(msg.choiceIds));
+        setPhase("powerup_select");
+      }
+      if (msg.type === "powerup_selected") {
+        setPhase("playing");
+      }
+    };
+
+    transport.onMessage(preGameHandler);
+    return () => transport.offMessage(preGameHandler);
+  }, [isHost, transport]);
+
+
+  // Guest waiting for host to send modifier choices
+  if (!isHost && phase === "modifier_select" && modChoices.length === 0) {
+    return (
+      <div style={mpStyles.container}>
+        <div style={{ fontSize: "2rem" }}>⏳</div>
+        <p style={mpStyles.title}>Connecting...</p>
+        <p style={mpStyles.subtitle}>Waiting for partner to set up the game</p>
+      </div>
+    );
+  }
 
   // Modifier selection — host picks, guest watches read-only
   if (phase === "modifier_select" && modChoices.length > 0) {
