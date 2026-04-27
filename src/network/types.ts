@@ -25,4 +25,7 @@ export type NetMessage =
   | { type: "snapshot"; data: GameSnapshot }
   | { type: "event"; eventType: GameEventType; data?: unknown }
   | { type: "scores"; scores: ScoreData; won: boolean }
-  | { type: "powerup_selected" };
+  | { type: "modifier_choices"; choiceIds: string[] }
+  | { type: "modifier_selected"; choiceIndex: number }
+  | { type: "powerup_choices"; choiceIds: string[] }
+  | { type: "powerup_selected"; choiceIndex: number };

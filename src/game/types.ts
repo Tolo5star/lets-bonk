@@ -93,6 +93,7 @@ export interface EnemySnapshot {
   radius: number;
   enraged: boolean;
   stateTimer: number;
+  bossVariant?: string;
 }
 
 export interface ProjectileSnapshot {

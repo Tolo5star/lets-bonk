@@ -147,6 +147,23 @@ export class Enemy {
     this.baseSpeed *= mult;
   }
 
+  /** Called when the enrage transition fires — apply Phase 2 variant-specific stats */
+  applyPhase2Stats() {
+    this.speed = this.baseSpeed * MINI_BOSS_ENRAGE_SPEED_MULT;
+    this.damage = this.baseDamage * MINI_BOSS_ENRAGE_DAMAGE_MULT;
+    // Summoner gets rapid fire in Phase 2
+    if (this.bossVariant === "summoner") {
+      this.fireRateTicks = 25; // ~0.8s between shots at 30Hz
+      this.recoveryTicks = 15;
+      this.telegraphTicks = 12;
+    }
+    // Frenzy gets shorter charge recovery
+    if (this.bossVariant === "frenzy") {
+      this.recoveryTicks = 15;
+      this.telegraphTicks = 10;
+    }
+  }
+
   private distTo(px: number, py: number): number {
     const dx = px - this.x;
     const dy = py - this.y;
@@ -223,9 +240,7 @@ export class Enemy {
       this.vx = 0;
       this.vy = 0;
       if (this.stateTimer >= this.enrageTransitionTicks) {
-        // Apply Phase 2 stats
-        this.speed = this.baseSpeed * MINI_BOSS_ENRAGE_SPEED_MULT;
-        this.damage = this.baseDamage * MINI_BOSS_ENRAGE_DAMAGE_MULT;
+        this.applyPhase2Stats();
         this.state = EnemyState.Recovery;
         this.stateTimer = 0;
         // Shockwave blast
@@ -487,6 +502,7 @@ export class Enemy {
       radius: this.radius,
       enraged: this.enraged,
       stateTimer: this.stateTimer,
+      bossVariant: this.type === EnemyType.MiniBoss ? this.bossVariant : undefined,
     };
   }
 }

@@ -299,12 +299,24 @@ function drawEnemy(ctx: CanvasRenderingContext2D, enemy: EnemySnapshot) {
     }
   }
 
-  // Mini boss crown
+  // Mini boss: show variant icon + phase indicator
   if (enemy.type === EnemyType.MiniBoss) {
-    ctx.fillStyle = "#ffeaa7";
-    ctx.font = `${r * 0.5}px sans-serif`;
+    const variantIcon = enemy.bossVariant === "frenzy" ? "⚡"
+                      : enemy.bossVariant === "summoner" ? "🔮"
+                      : "👑"; // brute
+    ctx.font = `${r * 0.55}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("👑", 0, -r - 4);
+    ctx.fillText(variantIcon, 0, -r - 4);
+
+    // Phase 2 indicator: glowing "II" above icon
+    if (enemy.enraged) {
+      ctx.font = `bold ${r * 0.3}px 'Lilita One', sans-serif`;
+      ctx.fillStyle = "#ff4757";
+      ctx.strokeStyle = "rgba(0,0,0,0.5)";
+      ctx.lineWidth = 3;
+      ctx.strokeText("PHASE 2", 0, -r - r * 0.6 - 8);
+      ctx.fillText("PHASE 2", 0, -r - r * 0.6 - 8);
+    }
   }
 
   ctx.restore();

@@ -50,3 +50,7 @@ export function pickPowerUpChoices(count = 3): PowerUp[] {
   const shuffled = [...ALL_POWERUPS].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
 }
+
+export function getPowerUpsByIds(ids: string[]): PowerUp[] {
+  return ids.map(id => ALL_POWERUPS.find(p => p.id === id)!).filter(Boolean);
+}

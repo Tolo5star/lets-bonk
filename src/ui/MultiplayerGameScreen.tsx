@@ -12,8 +12,8 @@ import { SnapshotInterpolator } from "../render/interpolation";
 import { spawnAttackText, spawnDamageText, spawnHealText } from "../render/draw-effects";
 import type { WsTransport } from "../network/ws-transport";
 import type { NetMessage } from "../network/types";
-import { pickModifierChoices, defaultConfig } from "../game/modifiers";
-import { pickPowerUpChoices, type PowerUp } from "../game/powerups";
+import { pickModifierChoices, getModifiersByIds, defaultConfig, type RunModifier } from "../game/modifiers";
+import { pickPowerUpChoices, getPowerUpsByIds, type PowerUp } from "../game/powerups";
 import { fonts } from "./theme";
 import type {
   Role,
@@ -41,13 +41,12 @@ export function MultiplayerGameScreen({
   const [isTouch] = useState(isTouchDevice);
   const [disconnected, setDisconnected] = useState(false);
 
-  // Modifier selection (host only, before game starts)
   type MPPhase = "modifier_select" | "playing" | "powerup_select";
-  const [phase, setPhase] = useState<MPPhase>(isHost ? "modifier_select" : "playing");
-  const [modChoices] = useState(() => pickModifierChoices(3));
+  const [phase, setPhase] = useState<MPPhase>(isHost ? "modifier_select" : "modifier_select");
+  const [modChoices, setModChoices] = useState<RunModifier[]>(() => isHost ? pickModifierChoices(3) : []);
   const [powerUpChoices, setPowerUpChoices] = useState<PowerUp[]>([]);
   const gameRef = useRef<GameLoop | null>(null);
-  const [gameStartTrigger, setGameStartTrigger] = useState(isHost ? null : defaultConfig());
+  const [gameStartTrigger, setGameStartTrigger] = useState<ReturnType<typeof defaultConfig> | null>(null);
   const { toasts, showToast } = useFeedbackToasts();
   const showToastRef = useRef(showToast);
   showToastRef.current = showToast;
@@ -227,9 +226,44 @@ export function MultiplayerGameScreen({
           onGameOverRef.current(msg.scores, msg.won);
           break;
 
+        case "modifier_choices":
+          // Guest: receive choices from host, show read-only view
+          if (!isHost) {
+            setModChoices(getModifiersByIds(msg.choiceIds));
+            setPhase("modifier_select");
+          }
+          break;
+
+        case "modifier_selected": {
+          // Guest: host picked, apply same config and start game
+          if (!isHost) {
+            const choices = modChoices;
+            const picked = choices[msg.choiceIndex];
+            if (picked) {
+              const config = defaultConfig();
+              picked.apply(config);
+              setGameStartTrigger(config);
+            } else {
+              setGameStartTrigger(defaultConfig());
+            }
+            setPhase("playing");
+          }
+          break;
+        }
+
+        case "powerup_choices":
+          // Guest: show read-only power-up choices
+          if (!isHost) {
+            setPowerUpChoices(getPowerUpsByIds(msg.choiceIds));
+            setPhase("powerup_select");
+          }
+          break;
+
         case "powerup_selected":
-          // Guest: dismiss the waiting overlay
-          if (!isHost) setPhase("playing");
+          // Guest: host picked, dismiss overlay
+          if (!isHost) {
+            setPhase("playing");
+          }
           break;
 
         case "peer_left":
@@ -301,7 +335,10 @@ export function MultiplayerGameScreen({
           onGameOverRef.current(d.scores, true);
         }
         if (event.type === "powerup_available") {
-          setPowerUpChoices(pickPowerUpChoices(3));
+          const choices = pickPowerUpChoices(3);
+          setPowerUpChoices(choices);
+          // Send choices to guest so they can see the read-only view
+          transport.send({ type: "powerup_choices", choiceIds: choices.map(p => p.id) });
           setPhase("powerup_select");
         }
       });
@@ -430,20 +467,41 @@ export function MultiplayerGameScreen({
     return () => { inputRef.current?.destroy(); };
   }, []);
 
-  // Host-only modifier selection before game starts
-  if (isHost && phase === "modifier_select") {
+  // Host: send modifier choices to guest as soon as they're available
+  useEffect(() => {
+    if (isHost && modChoices.length > 0 && phase === "modifier_select") {
+      transport.send({ type: "modifier_choices", choiceIds: modChoices.map(m => m.id) });
+    }
+  }, [isHost, modChoices, phase, transport]);
+
+  // Guest: listen for modifier_choices and modifier_selected via netHandler (done in main effect)
+
+
+  // Modifier selection — host picks, guest watches read-only
+  if (phase === "modifier_select" && modChoices.length > 0) {
     return (
       <div style={mpStyles.container}>
         <div style={{ fontSize: "2rem" }}>🎲</div>
         <h2 style={mpStyles.title}>Pick Your Chaos</h2>
-        <p style={mpStyles.subtitle}>One modifier per run</p>
+        {isHost
+          ? <p style={mpStyles.subtitle}>One modifier per run — your partner can see your choices</p>
+          : <p style={{ ...mpStyles.subtitle, color: "#ffeaa7" }}>⏳ Partner is choosing...</p>
+        }
         <div style={mpStyles.choices}>
-          {modChoices.map((mod) => (
-            <button key={mod.id} style={mpStyles.card}
+          {modChoices.map((mod, idx) => (
+            <button key={mod.id}
+              style={{
+                ...mpStyles.card,
+                opacity: isHost ? 1 : 0.5,
+                cursor: isHost ? "pointer" : "default",
+                border: isHost ? "2px solid rgba(255,255,255,0.15)" : "2px solid rgba(255,255,255,0.06)",
+              }}
               onClick={() => {
+                if (!isHost) return;
                 const config = defaultConfig();
                 mod.apply(config);
                 setGameStartTrigger(config);
+                transport.send({ type: "modifier_selected", choiceIndex: idx });
                 setPhase("playing");
               }}>
               <span style={{ fontSize: "1.8rem" }}>{mod.icon}</span>
@@ -452,21 +510,15 @@ export function MultiplayerGameScreen({
             </button>
           ))}
         </div>
-        <button style={mpStyles.skipBtn}
-          onClick={() => { setGameStartTrigger(defaultConfig()); setPhase("playing"); }}>
-          No modifier (classic)
-        </button>
-      </div>
-    );
-  }
-
-  // Guest waits while host picks modifier
-  if (!isHost && phase === "playing" && !gameStartTrigger) {
-    return (
-      <div style={mpStyles.container}>
-        <div style={{ fontSize: "2rem" }}>⏳</div>
-        <p style={mpStyles.title}>Waiting for partner...</p>
-        <p style={mpStyles.subtitle}>Partner is picking a modifier</p>
+        {isHost && (
+          <button style={mpStyles.skipBtn} onClick={() => {
+            setGameStartTrigger(defaultConfig());
+            transport.send({ type: "modifier_selected", choiceIndex: -1 });
+            setPhase("playing");
+          }}>
+            No modifier (classic)
+          </button>
+        )}
       </div>
     );
   }
@@ -504,18 +556,28 @@ export function MultiplayerGameScreen({
         </div>
       )}
 
-      {/* Host: power-up selection overlay */}
-      {isHost && phase === "powerup_select" && (
+      {/* Power-up overlay — host picks, guest sees read-only */}
+      {phase === "powerup_select" && powerUpChoices.length > 0 && (
         <div style={mpStyles.overlay}>
           <div style={{ fontSize: "2rem" }}>⚡</div>
           <h2 style={{ ...mpStyles.title, color: "#ffeaa7" }}>Power Up!</h2>
-          <p style={mpStyles.subtitle}>Wave 2 cleared! Pick a boost</p>
+          {isHost
+            ? <p style={mpStyles.subtitle}>Pick a boost for the next waves</p>
+            : <p style={{ ...mpStyles.subtitle, color: "#ffeaa7" }}>⏳ Partner is choosing...</p>
+          }
           <div style={mpStyles.choices}>
-            {powerUpChoices.map((pu) => (
-              <button key={pu.id} style={mpStyles.card}
+            {powerUpChoices.map((pu, idx) => (
+              <button key={pu.id}
+                style={{
+                  ...mpStyles.card,
+                  opacity: isHost ? 1 : 0.5,
+                  cursor: isHost ? "pointer" : "default",
+                  border: isHost ? "2px solid rgba(255,255,255,0.15)" : "2px solid rgba(255,255,255,0.06)",
+                }}
                 onClick={() => {
+                  if (!isHost) return;
                   gameRef.current?.applyPowerUp(pu.apply);
-                  transport.send({ type: "powerup_selected" });
+                  transport.send({ type: "powerup_selected", choiceIndex: idx });
                   setPhase("playing");
                 }}>
                 <span style={{ fontSize: "1.8rem" }}>{pu.icon}</span>
@@ -524,15 +586,6 @@ export function MultiplayerGameScreen({
               </button>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Guest: waiting while host picks power-up */}
-      {!isHost && phase === "powerup_select" && (
-        <div style={mpStyles.overlay}>
-          <div style={{ fontSize: "2rem" }}>⚡</div>
-          <p style={{ ...mpStyles.title, color: "#ffeaa7" }}>Power Up incoming!</p>
-          <p style={mpStyles.subtitle}>Partner is picking a boost...</p>
         </div>
       )}
     </div>

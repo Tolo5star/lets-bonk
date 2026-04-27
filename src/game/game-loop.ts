@@ -237,12 +237,16 @@ export class GameLoop {
           nextWave: this.spawner.currentWave,
           taunt: this.spawner.waveTaunt,
         });
+      }
 
-        // Offer power-up after wave 2
-        if (this.score.wavesCompleted === this.powerUpWave) {
-          this.powerUpPending = true;
-          this.emit("powerup_available");
-        }
+      // Offer power-up after wave 2 — delayed by 30 ticks (1s) so death
+      // animations finish before the game freezes
+      if (
+        this.waveCooldownTicks === 30 &&
+        this.score.wavesCompleted === this.powerUpWave
+      ) {
+        this.powerUpPending = true;
+        this.emit("powerup_available");
       }
       if (this.waveCooldownTicks >= this.WAVE_COOLDOWN) {
         this.waveCooldownTicks = 0;

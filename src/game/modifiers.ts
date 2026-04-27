@@ -97,3 +97,8 @@ export function pickModifierChoices(count = 3): RunModifier[] {
   const shuffled = [...ALL_MODIFIERS].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
 }
+
+/** Reconstruct modifier list from IDs (for multiplayer guest sync) */
+export function getModifiersByIds(ids: string[]): RunModifier[] {
+  return ids.map(id => ALL_MODIFIERS.find(m => m.id === id)!).filter(Boolean);
+}
