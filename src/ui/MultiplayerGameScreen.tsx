@@ -12,6 +12,9 @@ import { SnapshotInterpolator } from "../render/interpolation";
 import { spawnAttackText, spawnDamageText, spawnHealText } from "../render/draw-effects";
 import type { WsTransport } from "../network/ws-transport";
 import type { NetMessage } from "../network/types";
+import { pickModifierChoices, defaultConfig } from "../game/modifiers";
+import { pickPowerUpChoices, type PowerUp } from "../game/powerups";
+import { fonts } from "./theme";
 import type {
   Role,
   ScoreData,
@@ -37,6 +40,14 @@ export function MultiplayerGameScreen({
   const [playerState, setPlayerState] = useState<PlayerSnapshot | null>(null);
   const [isTouch] = useState(isTouchDevice);
   const [disconnected, setDisconnected] = useState(false);
+
+  // Modifier selection (host only, before game starts)
+  type MPPhase = "modifier_select" | "playing" | "powerup_select";
+  const [phase, setPhase] = useState<MPPhase>(isHost ? "modifier_select" : "playing");
+  const [modChoices] = useState(() => pickModifierChoices(3));
+  const [powerUpChoices, setPowerUpChoices] = useState<PowerUp[]>([]);
+  const gameRef = useRef<GameLoop | null>(null);
+  const [gameStartTrigger, setGameStartTrigger] = useState(isHost ? null : defaultConfig());
   const { toasts, showToast } = useFeedbackToasts();
   const showToastRef = useRef(showToast);
   showToastRef.current = showToast;
@@ -98,8 +109,9 @@ export function MultiplayerGameScreen({
     [tryMountTouch]
   );
 
-  // === GAME LIFECYCLE ===
+  // === GAME LIFECYCLE — starts once gameStartTrigger is set ===
   useEffect(() => {
+    if (!gameStartTrigger) return;
     const canvas = canvasRef.current;
     const input = inputRef.current;
     if (!canvas || !input) return;
@@ -215,6 +227,11 @@ export function MultiplayerGameScreen({
           onGameOverRef.current(msg.scores, msg.won);
           break;
 
+        case "powerup_selected":
+          // Guest: dismiss the waiting overlay
+          if (!isHost) setPhase("playing");
+          break;
+
         case "peer_left":
           setDisconnected(true);
           break;
@@ -283,6 +300,10 @@ export function MultiplayerGameScreen({
           transport.send({ type: "scores", scores: d.scores, won: true });
           onGameOverRef.current(d.scores, true);
         }
+        if (event.type === "powerup_available") {
+          setPowerUpChoices(pickPowerUpChoices(3));
+          setPhase("powerup_select");
+        }
       });
 
       // Read inputs synchronously before each game tick
@@ -305,6 +326,8 @@ export function MultiplayerGameScreen({
         transport.send({ type: "snapshot", data: snap });
       }, TICK_MS);
 
+      game.setModConfig(gameStartTrigger!);
+      gameRef.current = game;
       game.start();
     } else {
       // === GUEST: send inputs + predict visuals ===
@@ -400,12 +423,53 @@ export function MultiplayerGameScreen({
       renderer.destroy();
       transport.offMessage(netHandler);
     };
-  }, [isHost, role, transport, tryMountTouch]);
+  }, [isHost, role, transport, tryMountTouch, gameStartTrigger]);
 
   // Cleanup input on unmount
   useEffect(() => {
     return () => { inputRef.current?.destroy(); };
   }, []);
+
+  // Host-only modifier selection before game starts
+  if (isHost && phase === "modifier_select") {
+    return (
+      <div style={mpStyles.container}>
+        <div style={{ fontSize: "2rem" }}>🎲</div>
+        <h2 style={mpStyles.title}>Pick Your Chaos</h2>
+        <p style={mpStyles.subtitle}>One modifier per run</p>
+        <div style={mpStyles.choices}>
+          {modChoices.map((mod) => (
+            <button key={mod.id} style={mpStyles.card}
+              onClick={() => {
+                const config = defaultConfig();
+                mod.apply(config);
+                setGameStartTrigger(config);
+                setPhase("playing");
+              }}>
+              <span style={{ fontSize: "1.8rem" }}>{mod.icon}</span>
+              <span style={mpStyles.cardName}>{mod.name}</span>
+              <span style={mpStyles.cardDesc}>{mod.description}</span>
+            </button>
+          ))}
+        </div>
+        <button style={mpStyles.skipBtn}
+          onClick={() => { setGameStartTrigger(defaultConfig()); setPhase("playing"); }}>
+          No modifier (classic)
+        </button>
+      </div>
+    );
+  }
+
+  // Guest waits while host picks modifier
+  if (!isHost && phase === "playing" && !gameStartTrigger) {
+    return (
+      <div style={mpStyles.container}>
+        <div style={{ fontSize: "2rem" }}>⏳</div>
+        <p style={mpStyles.title}>Waiting for partner...</p>
+        <p style={mpStyles.subtitle}>Partner is picking a modifier</p>
+      </div>
+    );
+  }
 
   if (disconnected) {
     return (
@@ -437,6 +501,38 @@ export function MultiplayerGameScreen({
       {isTouch && role === "fighter" && (
         <div style={styles.controlsFullWidth}>
           <FighterControls onMount={onFighterMount} player={playerState} />
+        </div>
+      )}
+
+      {/* Host: power-up selection overlay */}
+      {isHost && phase === "powerup_select" && (
+        <div style={mpStyles.overlay}>
+          <div style={{ fontSize: "2rem" }}>⚡</div>
+          <h2 style={{ ...mpStyles.title, color: "#ffeaa7" }}>Power Up!</h2>
+          <p style={mpStyles.subtitle}>Wave 2 cleared! Pick a boost</p>
+          <div style={mpStyles.choices}>
+            {powerUpChoices.map((pu) => (
+              <button key={pu.id} style={mpStyles.card}
+                onClick={() => {
+                  gameRef.current?.applyPowerUp(pu.apply);
+                  transport.send({ type: "powerup_selected" });
+                  setPhase("playing");
+                }}>
+                <span style={{ fontSize: "1.8rem" }}>{pu.icon}</span>
+                <span style={mpStyles.cardName}>{pu.name}</span>
+                <span style={mpStyles.cardDesc}>{pu.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Guest: waiting while host picks power-up */}
+      {!isHost && phase === "powerup_select" && (
+        <div style={mpStyles.overlay}>
+          <div style={{ fontSize: "2rem" }}>⚡</div>
+          <p style={{ ...mpStyles.title, color: "#ffeaa7" }}>Power Up incoming!</p>
+          <p style={mpStyles.subtitle}>Partner is picking a boost...</p>
         </div>
       )}
     </div>
@@ -491,5 +587,86 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#1a1a2e",
     color: "#ff6b6b",
     fontFamily: "monospace",
+  },
+};
+
+const mpStyles: Record<string, React.CSSProperties> = {
+  container: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    height: "100%",
+    background: "radial-gradient(ellipse at 50% 40%, #2a2a4a 0%, #1a1a2e 70%)",
+    padding: "1.5rem",
+    gap: "10px",
+  },
+  overlay: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(10, 10, 30, 0.88)",
+    backdropFilter: "blur(6px)",
+    zIndex: 20,
+    gap: "10px",
+    padding: "1rem",
+  },
+  title: {
+    fontFamily: fonts.display,
+    fontSize: "clamp(1.5rem, 5vw, 2.2rem)",
+    color: "#e0e0e0",
+    textShadow: "2px 2px 0 rgba(0,0,0,0.3)",
+  },
+  subtitle: {
+    fontFamily: "'Nunito', sans-serif",
+    fontWeight: 700,
+    fontSize: "0.85rem",
+    color: "rgba(255,255,255,0.5)",
+  },
+  choices: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+  card: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "5px",
+    padding: "12px 16px",
+    borderRadius: "14px",
+    border: "2px solid rgba(255,255,255,0.15)",
+    background: "rgba(255,255,255,0.05)",
+    cursor: "pointer",
+    minWidth: "110px",
+    maxWidth: "150px",
+    fontFamily: "'Nunito', sans-serif",
+    color: "#f0e6d3",
+  },
+  cardName: {
+    fontFamily: fonts.display,
+    fontSize: "0.9rem",
+    color: "#ffeaa7",
+  },
+  cardDesc: {
+    fontSize: "0.68rem",
+    fontWeight: 600,
+    color: "rgba(255,255,255,0.5)",
+    textAlign: "center",
+  },
+  skipBtn: {
+    padding: "7px 18px",
+    fontFamily: "'Nunito', sans-serif",
+    fontWeight: 700,
+    fontSize: "0.75rem",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: "8px",
+    background: "transparent",
+    color: "rgba(255,255,255,0.4)",
+    cursor: "pointer",
   },
 };

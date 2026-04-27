@@ -24,4 +24,5 @@ export type NetMessage =
   | { type: "input"; mover?: MoverInput; fighter?: FighterInput }
   | { type: "snapshot"; data: GameSnapshot }
   | { type: "event"; eventType: GameEventType; data?: unknown }
-  | { type: "scores"; scores: ScoreData; won: boolean };
+  | { type: "scores"; scores: ScoreData; won: boolean }
+  | { type: "powerup_selected" };
