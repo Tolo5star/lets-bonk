@@ -36,11 +36,14 @@ import {
 
 let nextEnemyId = 1;
 
+export type BossVariantType = "brute" | "frenzy" | "summoner";
+
 export interface EnemyAttackResult {
   damage: number;
   knockback: number;
   fromX: number;
   fromY: number;
+  isShockwave?: boolean; // Boss enrage burst
 }
 
 export interface ProjectileSpawn {
@@ -68,6 +71,8 @@ export class Enemy {
   deathTimer = 0;
 
   enraged = false; // boss phase 2
+  bossVariant: BossVariantType = "brute";
+  private enrageTransitionTicks = 15; // 0.5s at 30Hz
 
   // Type-specific
   private speed: number;
@@ -162,15 +167,18 @@ export class Enemy {
       return;
     }
 
-    // Boss enrage at 50% HP
+    // Boss enrage at 50% HP — enter dramatic transition
     if (
       this.type === EnemyType.MiniBoss &&
       !this.enraged &&
       this.hp / this.maxHp <= MINI_BOSS_ENRAGE_HP_RATIO
     ) {
       this.enraged = true;
-      this.speed = this.baseSpeed * MINI_BOSS_ENRAGE_SPEED_MULT;
-      this.damage = this.baseDamage * MINI_BOSS_ENRAGE_DAMAGE_MULT;
+      this.state = EnemyState.EnrageTransition;
+      this.stateTimer = 0;
+      this.vx = 0;
+      this.vy = 0;
+      // Stats applied after transition fires
     }
 
     // Apply knockback
@@ -210,6 +218,28 @@ export class Enemy {
       return { attack, projectile };
     }
 
+    // Boss enrage transition — freeze then shockwave
+    if (this.state === EnemyState.EnrageTransition) {
+      this.vx = 0;
+      this.vy = 0;
+      if (this.stateTimer >= this.enrageTransitionTicks) {
+        // Apply Phase 2 stats
+        this.speed = this.baseSpeed * MINI_BOSS_ENRAGE_SPEED_MULT;
+        this.damage = this.baseDamage * MINI_BOSS_ENRAGE_DAMAGE_MULT;
+        this.state = EnemyState.Recovery;
+        this.stateTimer = 0;
+        // Shockwave blast
+        attack = {
+          damage: this.damage * 0.8,
+          knockback: 20, // huge — throws player to edge
+          fromX: this.x,
+          fromY: this.y,
+          isShockwave: true,
+        };
+      }
+      return { attack, projectile };
+    }
+
     // Recovery after attack
     if (this.state === EnemyState.Recovery) {
       if (this.stateTimer >= this.recoveryTicks) {
@@ -228,8 +258,26 @@ export class Enemy {
 
     switch (this.type) {
       case EnemyType.Basic:
-      case EnemyType.MiniBoss:
         ({ attack } = this.tickMelee(playerX, playerY, dist));
+        break;
+      case EnemyType.MiniBoss:
+        // Phase 2: variant-specific behavior
+        if (this.enraged) {
+          switch (this.bossVariant) {
+            case "frenzy":
+              ({ attack } = this.tickCharger(playerX, playerY, dist));
+              break;
+            case "summoner":
+              ({ projectile } = this.tickRanged(playerX, playerY, dist));
+              break;
+            case "brute":
+            default:
+              ({ attack } = this.tickMelee(playerX, playerY, dist));
+              break;
+          }
+        } else {
+          ({ attack } = this.tickMelee(playerX, playerY, dist));
+        }
         break;
       case EnemyType.Charger:
         ({ attack } = this.tickCharger(playerX, playerY, dist));
@@ -438,6 +486,7 @@ export class Enemy {
           : 0,
       radius: this.radius,
       enraged: this.enraged,
+      stateTimer: this.stateTimer,
     };
   }
 }

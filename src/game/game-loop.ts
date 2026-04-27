@@ -172,7 +172,9 @@ export class GameLoop {
           (this.player.x - result.attack.fromX) ** 2 +
             (this.player.y - result.attack.fromY) ** 2
         );
-        if (dist < result.attack.knockback * 5 + PLAYER_RADIUS + enemy.radius) {
+        // Shockwave hits at any range; normal attacks check proximity
+        const isHit = result.attack.isShockwave || dist < result.attack.knockback * 5 + PLAYER_RADIUS + enemy.radius;
+        if (isHit) {
           const actualDamage = this.player.takeDamage(result.attack.damage);
           this.player.applyKnockback(
             result.attack.knockback * this.modConfig.playerKnockbackMult,
@@ -181,6 +183,9 @@ export class GameLoop {
           );
           this.score.damageTaken += actualDamage;
           this.emit("player_hit");
+          if (result.attack.isShockwave) {
+            this.emit("boss_enraged"); // reuse event for the flash/shake
+          }
         }
       }
 
@@ -211,10 +216,13 @@ export class GameLoop {
     // 7. Wave management
     const aliveEnemies = this.enemies.filter((e) => !e.dead).length;
     const newEnemies = this.spawner.tick(aliveEnemies);
-    // Apply enemy speed modifier to newly spawned enemies
-    if (this.modConfig.enemySpeedMult !== 1) {
-      for (const enemy of newEnemies) {
+    for (const enemy of newEnemies) {
+      if (this.modConfig.enemySpeedMult !== 1) {
         enemy.applySpeedMult(this.modConfig.enemySpeedMult);
+      }
+      // Assign boss variant so phase 2 uses the right behavior
+      if (enemy.type === 3 /* MiniBoss */) {
+        enemy.bossVariant = this.bossVariant;
       }
     }
     this.enemies.push(...newEnemies);

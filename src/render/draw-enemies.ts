@@ -82,17 +82,64 @@ function drawEnemy(ctx: CanvasRenderingContext2D, enemy: EnemySnapshot) {
     }
   }
 
-  // Boss recovery: shockwave ring expanding outward (after slam lands)
-  if (enemy.type === EnemyType.MiniBoss && enemy.state === EnemyState.Recovery) {
-    const recoverAge = Math.min(1, (Date.now() * 0.001 % 1)); // crude timer
-    // Use stateTimer-like approach via animation time
-    const waveR = 110 * (0.3 + recoverAge * 0.7);
-    const alpha = Math.max(0, 0.4 - recoverAge * 0.4);
+  // Boss enrage transition: white flash build-up + freeze
+  if (enemy.state === EnemyState.EnrageTransition) {
+    const progress = Math.min(enemy.stateTimer / 15, 1); // 0→1 over 15 ticks
+
+    // Expanding white ring
+    ctx.beginPath();
+    ctx.arc(0, 0, enemy.radius * (1 + progress * 0.8), 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${progress * 0.25})`;
+    ctx.fill();
+
+    // Pulsing bright border
+    ctx.beginPath();
+    ctx.arc(0, 0, enemy.radius + 8 + progress * 20, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 80, 80, ${0.4 + progress * 0.6})`;
+    ctx.lineWidth = 3 + progress * 6;
+    ctx.stroke();
+
+    // Energy lines radiating out
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const inner = enemy.radius + 5;
+      const outer = enemy.radius + 10 + progress * 30;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * inner, Math.sin(a) * inner);
+      ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
+      ctx.strokeStyle = `rgba(255, 50, 50, ${progress * 0.7})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // "PHASE 2" text as it builds
+    if (progress > 0.6) {
+      ctx.fillStyle = `rgba(255, 80, 80, ${(progress - 0.6) / 0.4})`;
+      ctx.font = `bold ${14 + progress * 8}px 'Lilita One', sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("PHASE 2!", 0, -enemy.radius - 22);
+    }
+  }
+
+  // Boss shockwave ring expanding outward after enrage fires
+  if (enemy.type === EnemyType.MiniBoss && enemy.enraged && enemy.state === EnemyState.Recovery && enemy.stateTimer < 25) {
+    const progress = enemy.stateTimer / 25;
+    const waveR = enemy.radius + progress * 180;
+    const alpha = Math.max(0, 0.6 - progress * 0.6);
     ctx.beginPath();
     ctx.arc(0, 0, waveR, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255, 150, 50, ${alpha})`;
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = `rgba(255, 80, 80, ${alpha})`;
+    ctx.lineWidth = 6 - progress * 4;
     ctx.stroke();
+    // Second wave
+    if (progress > 0.3) {
+      const wave2R = enemy.radius + (progress - 0.3) * 120;
+      ctx.beginPath();
+      ctx.arc(0, 0, wave2R, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 150, 50, ${alpha * 0.5})`;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
   }
 
   // Charger trail

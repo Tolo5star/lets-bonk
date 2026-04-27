@@ -43,6 +43,7 @@ export enum EnemyState {
   Recovery = 5,
   Stunned = 6,
   Dying = 7,
+  EnrageTransition = 8, // Boss phase 2 entry: freeze → shockwave
 }
 
 export interface Vec2 {
@@ -91,6 +92,7 @@ export interface EnemySnapshot {
   telegraphProgress: number;
   radius: number;
   enraged: boolean;
+  stateTimer: number;
 }
 
 export interface ProjectileSnapshot {
