@@ -32,9 +32,11 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
 
   const [phase, setPhase] = useState<GamePhase>("modifier_select");
   const [modChoices] = useState(() => pickModifierChoices(3));
-  const [selectedMod, setSelectedMod] = useState<ModifierConfig>(defaultConfig());
+  const [_selectedMod, setSelectedMod] = useState<ModifierConfig>(defaultConfig());
   const [powerUpChoices, setPowerUpChoices] = useState<PowerUp[]>([]);
   const gameRef = useRef<GameLoop | null>(null);
+  // Separate trigger for game start — only fires once, independent of phase
+  const [gameStartTrigger, setGameStartTrigger] = useState<ModifierConfig | null>(null);
 
   // Create InputManager ONCE eagerly — it must exist before children mount
   const inputRef = useRef<InputManager | null>(null);
@@ -80,13 +82,9 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
     [tryMountTouch]
   );
 
-  const gameInitedRef = useRef(false);
-
-  // Game lifecycle — only starts ONCE after modifier selection
+  // Game lifecycle — starts once when gameStartTrigger is set (after modifier picked)
   useEffect(() => {
-    if (phase !== "playing") return;
-    if (gameInitedRef.current) return; // already running, don't recreate
-    gameInitedRef.current = true;
+    if (!gameStartTrigger) return;
 
     const canvas = canvasRef.current;
     const input = inputRef.current;
@@ -203,7 +201,7 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
     }, 100);
 
     // Apply selected modifier
-    game.setModConfig(selectedMod);
+    game.setModConfig(gameStartTrigger);
     gameRef.current = game;
 
     game.start();
@@ -215,9 +213,7 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
       game.stop();
       renderer.destroy();
     };
-  // phase and selectedMod intentionally excluded — game only starts once
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tryMountTouch]);
+  }, [tryMountTouch, gameStartTrigger]);
 
   // Cleanup input on unmount
   useEffect(() => {
@@ -241,6 +237,7 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
                 const config = defaultConfig();
                 mod.apply(config);
                 setSelectedMod(config);
+                setGameStartTrigger(config); // starts the game
                 setPhase("playing");
               }}
             >
@@ -252,7 +249,10 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
         </div>
         <button
           style={ms.skipBtn}
-          onClick={() => setPhase("playing")}
+          onClick={() => {
+            setGameStartTrigger(defaultConfig()); // starts with defaults
+            setPhase("playing");
+          }}
         >
           No modifier (classic)
         </button>
