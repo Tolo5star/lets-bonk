@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { GameLoop } from "../game-loop";
 import { defaultConfig } from "../modifiers";
-import { PlayerState } from "../types";
 
 // Stub window.setInterval / clearInterval for node
 vi.stubGlobal("window", { setInterval, clearInterval });
@@ -62,8 +61,6 @@ describe("GameLoop", () => {
     game.powerUpWave = 0; // trigger immediately
     game.start();
 
-    const tickBefore = game.tick;
-
     // Simulate power-up pending
     game.powerUpPending = true;
 
@@ -71,11 +68,6 @@ describe("GameLoop", () => {
     game.setMoverInput({ moveX: 1, moveY: 0, dash: false });
     game.setFighterInput({ attackStart: false, attackHold: false, attackRelease: false, blockHold: false, healHold: false });
 
-    // The internal update runs via setInterval, so let's call the snapshot
-    // The tick counter should NOT advance while powerUpPending
-    // We need to wait for one interval to fire
-    const snap = game.snapshot();
-    // Game should be frozen — tick shouldn't advance much
     game.stop();
 
     // Now resume
