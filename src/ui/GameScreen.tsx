@@ -226,8 +226,9 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
   if (phase === "modifier_select") {
     return (
       <div style={ms.container}>
+        <div style={{ fontSize: "2rem" }}>🎲</div>
         <h2 style={ms.title}>Pick Your Chaos</h2>
-        <p style={ms.subtitle}>Choose a modifier for this run</p>
+        <p style={ms.subtitle}>One modifier per run — choose wisely (or don't)</p>
         <div style={ms.choices}>
           {modChoices.map((mod) => (
             <button
@@ -263,8 +264,9 @@ export function GameScreen({ onGameOver }: GameScreenProps) {
   // --- Power-up selection (mid-game overlay) ---
   const powerUpOverlay = phase === "powerup_select" && (
     <div style={ms.powerUpOverlay}>
-      <h2 style={ms.title}>Power Up!</h2>
-      <p style={ms.subtitle}>Choose a boost for the next waves</p>
+      <div style={{ fontSize: "2rem" }}>⚡</div>
+      <h2 style={{ ...ms.title, color: "#ffeaa7" }}>Power Up!</h2>
+      <p style={ms.subtitle}>Wave 2 cleared! Pick a boost for the final stretch</p>
       <div style={ms.choices}>
         {powerUpChoices.map((pu) => (
           <button
